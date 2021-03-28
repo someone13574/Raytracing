@@ -180,7 +180,6 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 		}
 	}
 
-	//ground
 	float t = -rayOrigin.y / rayDirection.y;
 	if (t > 0 && t < hit.distance && length(rayOrigin + rayDirection * t) < 400)
 	{
@@ -188,7 +187,6 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 		hit.position = rayOrigin + rayDirection * t;
 		hit.color = saturate(filteredChecker(hit.position.xz * 0.01) + 0.5);
 	}
-	//ground
 
 	hit.position = (hit.distance * rayDirection + rayOrigin) + hit.normal;
 
