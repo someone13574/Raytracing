@@ -65,24 +65,23 @@ cbuffer constants : register(b0, space0)
 	float z2;
 }
 
-float3 triIntersect(float3 rayOrigin, float3 rayDirection, float vertexPositions[3][3])
+float4 triIntersect(float3 origin, float3 rayDirection, float3 v0, float3 v1, float3 v2)
 {
-	float3 v1v0 = float3(vertexPositions[1][0], vertexPositions[1][1], vertexPositions[1][2]) - float3(vertexPositions[0][0], vertexPositions[0][1], vertexPositions[0][2]);
-	float3 v2v0 = float3(vertexPositions[2][0], vertexPositions[2][1], vertexPositions[2][2]) - float3(vertexPositions[0][0], vertexPositions[0][1], vertexPositions[0][2]);
-	float3 ov0 = rayOrigin - float3(vertexPositions[0][0], vertexPositions[0][1], vertexPositions[0][2]);
+	float3 v1v0 = v1 - v0;
+	float3 v2v0 = v2 - v0;
 	float3 n = cross(v1v0, v2v0);
-	float3 q = cross(ov0, rayDirection);
-	float d = 1.0 / dot(rayDirection, n);
+	float d = dot(rayDirection, n);
+	if (d > 0.0000001) return 1.#INF;
+	d = 1.0 / d;
+	float3 q = cross(origin - v0, rayDirection);
 	float u = d * dot(-q, v2v0);
+	if (u < 0 || u > 1) return 1.#INF;
 	float v = d * dot(q, v1v0);
-	float t = d * dot(-n, ov0);
+	if (v < 0 || u + v > 1) return 1.#INF;
+	float t = d * dot(-n, origin - v0);
+	if (t < 0) return 1.#INF;
 
-	if (u < 0.0 || u > 1.0 || v < 0.0 || (u + v) > 1.0 || t < 0)
-	{
-		t = 1.#INF;
-	}
-
-	return float3(t, u, v);
+	return float4(t, u, v, 1 - u - v);
 }
 
 float4 sampleUI(float2 position)
@@ -150,10 +149,11 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 			}
 			else
 			{
-				float3 dst = triIntersect(rayOrigin, rayDirection, triangleBuffer[node.triangleIndex].vertexPositions);
-				if (dst.x < hit.distance)
+				float vertexPositions[3][3] = triangleBuffer[node.triangleIndex].vertexPositions;
+				float4 intersect = triIntersect(rayOrigin, rayDirection, (float3)vertexPositions[0], (float3)vertexPositions[1], (float3)vertexPositions[2]);
+				if (intersect.x < hit.distance)
 				{
-					hit.distance = dst.x;
+					hit.distance = intersect.x;
 					hit.normal = (float3)triangleBuffer[node.triangleIndex].normal;
 					hit.color = hit.normal;
 				}
