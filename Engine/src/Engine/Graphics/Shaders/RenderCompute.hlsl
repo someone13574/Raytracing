@@ -115,25 +115,13 @@ float filteredChecker(float2 p)
 	return .5 - .5*s.x*s.y;
 }
 
-bool boxIntersection(float3 ro, float3 frd, float3 minc, float3 maxc)
+bool boxIntersection(float3 origin, float3 directionReciprocal, float3 lowerCorner, float3 upperCorner)
 {
-	float tx1 = (minc.x - ro.x) * frd.x;
-	float tx2 = (maxc.x - ro.x) * frd.x;
+	float3 t1 = (lowerCorner - origin) * directionReciprocal;
+	float3 t2 = (upperCorner - origin) * directionReciprocal;
 
-	float tmin = min(tx1, tx2);
-	float tmax = max(tx1, tx2);
-
-	float ty1 = (minc.y - ro.y) * frd.y;
-	float ty2 = (maxc.y - ro.y) * frd.y;
-
-	tmin = max(tmin, min(ty1, ty2));
-	tmax = min(tmax, max(ty1, ty2));
-
-	float tz1 = (minc.z - ro.z) * frd.z;
-	float tz2 = (maxc.z - ro.z) * frd.z;
-
-	tmin = max(tmin, min(tz1, tz2));
-	tmax = min(tmax, max(tz1, tz2));
+	float tmin = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
+	float tmax = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z));
 
 	return tmax >= tmin;
 }
@@ -206,7 +194,5 @@ void main(uint2 id : SV_DispatchThreadID)
 
 	RayHit hit = SampleScene(rayOrigin, rayDirection);
 
-	float diffuse = saturate(dot(hit.normal, lightDir));
-	float lighting = saturate(diffuse + 0.05);
 	result[id] = float4(hit.color, 1);
 }
