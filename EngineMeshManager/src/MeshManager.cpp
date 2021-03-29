@@ -52,4 +52,17 @@ namespace MeshManagement
 
 		return triangles;
 	}
+
+	std::vector<Mesh::Vertex> MeshManager::GetVertexArray()
+	{
+		upToDate = true;
+
+		std::vector<Mesh::Vertex> vertices;
+		for (int i = 0; i < meshes.size(); i++)
+		{
+			vertices.insert(vertices.end(), meshes[i].vertices.begin(), meshes[i].vertices.end());
+		}
+
+		return vertices;
+	}
 }

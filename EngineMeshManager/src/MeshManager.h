@@ -14,6 +14,7 @@ namespace MeshManagement
 	public:
 		void ReadMeshFile(const char* path);
 		bool IsUpToDate() const;
+		std::vector<Mesh::Vertex> GetVertexArray();
 		std::vector<Mesh::Triangle> GetTriangleArray();
 		Mesh GetMesh(uint16_t index);
 	private:

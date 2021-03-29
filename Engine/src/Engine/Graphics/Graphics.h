@@ -70,7 +70,7 @@ namespace Graphics
 		void CreateBackbuffers();
 		void CreateRenderTexture();
 		void UpdateUIBuffer();
-		void UpdateVertexBuffer();
+		void UpdateTriangleBuffer();
 	private:
 		ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags, UINT numDescriptors);
 		void WaitForPreviousFrame();
@@ -105,13 +105,17 @@ namespace Graphics
 		ComPtr<ID3D12Resource> uiUploadBuffer;
 		ComPtr<ID3D12DescriptorHeap> uiElementDescriptorHeap;
 
-		ComPtr<ID3D12Resource> vertexBuffer;
-		ComPtr<ID3D12Resource> vertexUploadBuffer;
-		ComPtr<ID3D12DescriptorHeap> vertexDescriptorHeap;
+		ComPtr<ID3D12Resource> triangleBuffer;
+		ComPtr<ID3D12Resource> triangleUploadBuffer;
+		ComPtr<ID3D12DescriptorHeap> triangleDescriptorHeap;
 
 		ComPtr<ID3D12Resource> boundingVolumeHierarchyBuffer;
 		ComPtr<ID3D12Resource> boundingVolumeHierarchyUploadBuffer;
 		ComPtr<ID3D12DescriptorHeap> boundingVolumeHierarchyDescriptorHeap;
+
+		ComPtr<ID3D12Resource> vertexBuffer;
+		ComPtr<ID3D12Resource> vertexUploadBuffer;
+		ComPtr<ID3D12DescriptorHeap> vertexDescriptorHeap;
 
 		UINT RTVDescriptorSize;
 		UINT UAVDescriptorSize;

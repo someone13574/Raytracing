@@ -30,7 +30,7 @@ public:
 		uint32_t rootIndex;
 		uint32_t nodeCount;
 		uint16_t triangleCount;
-		std::vector<Mesh::Triangle> triangles;
+		std::vector<Mesh::UncompressedTriangle> triangles;
 		std::vector<Node> nodeHierarchy;
 	};
 public:
@@ -45,7 +45,7 @@ public:
 	float SurfaceArea(AABB aabb);
 private:
 	uint32_t AllocateNode(Node node);
-	AABB TriangleToAABB(Mesh::Triangle triangle);
+	AABB TriangleToAABB(Mesh::UncompressedTriangle triangle);
 	AABB JoinAABB(AABB a, AABB b);
 	void Rotate(unsigned int index);
 private:

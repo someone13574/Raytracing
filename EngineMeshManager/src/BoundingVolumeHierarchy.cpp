@@ -22,7 +22,7 @@ void BoundingVolumeHierarchy::ReadMesh(Mesh mesh)
 
 		Node node;
 		node.triangleIndex = i;
-		node.aabb = TriangleToAABB(mesh.triangles[i]);
+		node.aabb = TriangleToAABB(mesh.uncompressedTriangles[i]);
 		node.isLeaf = 1;
 		node.parentIndex = 0;
 		node.childAIndex = 4294967295;
@@ -136,8 +136,8 @@ void BoundingVolumeHierarchy::ReadMesh(Mesh mesh)
 
 	tree.rootIndex = rootIndex;
 	tree.nodeCount = (uint32_t)nodeHierarchy.size();
-	tree.triangleCount = (uint32_t)mesh.triangles.size();
-	tree.triangles = mesh.triangles;
+	tree.triangleCount = (uint32_t)mesh.uncompressedTriangles.size();
+	tree.triangles = mesh.uncompressedTriangles;
 	tree.nodeHierarchy = nodeHierarchy;
 }
 
@@ -152,16 +152,16 @@ uint32_t BoundingVolumeHierarchy::AllocateNode(Node node)
 	return (uint32_t)nodeHierarchy.size() - 1;
 }
 
-BoundingVolumeHierarchy::AABB BoundingVolumeHierarchy::TriangleToAABB(Mesh::Triangle triangle)
+BoundingVolumeHierarchy::AABB BoundingVolumeHierarchy::TriangleToAABB(Mesh::UncompressedTriangle triangle)
 {
 	AABB aabb;
-	aabb.ax = fminf(triangle.vertexPositions[0][0], fminf(triangle.vertexPositions[1][0], triangle.vertexPositions[2][0]));
-	aabb.ay = fminf(triangle.vertexPositions[0][1], fminf(triangle.vertexPositions[1][1], triangle.vertexPositions[2][1]));
-	aabb.az = fminf(triangle.vertexPositions[0][2], fminf(triangle.vertexPositions[1][2], triangle.vertexPositions[2][2]));
+	aabb.ax = fminf(triangle.vertices[0].position[0], fminf(triangle.vertices[1].position[0], triangle.vertices[2].position[0]));
+	aabb.ay = fminf(triangle.vertices[0].position[1], fminf(triangle.vertices[1].position[1], triangle.vertices[2].position[1]));
+	aabb.az = fminf(triangle.vertices[0].position[2], fminf(triangle.vertices[1].position[2], triangle.vertices[2].position[2]));
 
-	aabb.bx = fmaxf(triangle.vertexPositions[0][0], fmaxf(triangle.vertexPositions[1][0], triangle.vertexPositions[2][0]));
-	aabb.by = fmaxf(triangle.vertexPositions[0][1], fmaxf(triangle.vertexPositions[1][1], triangle.vertexPositions[2][1]));
-	aabb.bz = fmaxf(triangle.vertexPositions[0][2], fmaxf(triangle.vertexPositions[1][2], triangle.vertexPositions[2][2]));
+	aabb.bx = fmaxf(triangle.vertices[0].position[0], fmaxf(triangle.vertices[1].position[0], triangle.vertices[2].position[0]));
+	aabb.by = fmaxf(triangle.vertices[0].position[1], fmaxf(triangle.vertices[1].position[1], triangle.vertices[2].position[1]));
+	aabb.bz = fmaxf(triangle.vertices[0].position[2], fmaxf(triangle.vertices[1].position[2], triangle.vertices[2].position[2]));
 
 	return aabb;
 }
@@ -218,7 +218,7 @@ void BoundingVolumeHierarchy::ReadMeshOptimized(Mesh mesh)
 
 		Node node;
 		node.triangleIndex = i;
-		node.aabb = TriangleToAABB(mesh.triangles[i]);
+		node.aabb = TriangleToAABB(mesh.uncompressedTriangles[i]);
 		node.isLeaf = 1;
 		node.parentIndex = 0;
 		node.childAIndex = 4294967295;
@@ -333,7 +333,7 @@ void BoundingVolumeHierarchy::ReadMeshOptimized(Mesh mesh)
 	tree.rootIndex = rootIndex;
 	tree.nodeCount = (uint32_t)nodeHierarchy.size();
 	tree.triangleCount = (uint32_t)mesh.triangles.size();
-	tree.triangles = mesh.triangles;
+	tree.triangles = mesh.uncompressedTriangles;
 	tree.nodeHierarchy = nodeHierarchy;
 }
 

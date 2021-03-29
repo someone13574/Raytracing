@@ -241,11 +241,11 @@ namespace Graphics
 		triangleBufferDescriptorRange.RegisterSpace = 0;
 		triangleBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		D3D12_ROOT_PARAMETER vertexBufferRootParameter;
-		ZeroMemory(&vertexBufferRootParameter, sizeof(vertexBufferRootParameter));
-		vertexBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		vertexBufferRootParameter.DescriptorTable = { 1, &triangleBufferDescriptorRange };
-		vertexBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		D3D12_ROOT_PARAMETER triangleBufferRootParameter;
+		ZeroMemory(&triangleBufferRootParameter, sizeof(triangleBufferRootParameter));
+		triangleBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		triangleBufferRootParameter.DescriptorTable = { 1, &triangleBufferDescriptorRange };
+		triangleBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Root Parameter for Bounding Volume Hierarchy Node Buffer
 		D3D12_DESCRIPTOR_RANGE bvhNodeBufferDescriptorRange;
@@ -262,8 +262,23 @@ namespace Graphics
 		bvhNodeBufferRootParameter.DescriptorTable = { 1, &bvhNodeBufferDescriptorRange };
 		bvhNodeBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+		//Root parameter for vertex buffer
+		D3D12_DESCRIPTOR_RANGE vertexBufferDescriptorRange;
+		ZeroMemory(&vertexBufferDescriptorRange, sizeof(vertexBufferDescriptorRange));
+		vertexBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		vertexBufferDescriptorRange.NumDescriptors = 1;
+		vertexBufferDescriptorRange.BaseShaderRegister = 2;
+		vertexBufferDescriptorRange.RegisterSpace = 0;
+		vertexBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER vertexBufferRootParameter;
+		ZeroMemory(&vertexBufferRootParameter, sizeof(vertexBufferRootParameter));
+		vertexBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		vertexBufferRootParameter.DescriptorTable = { 1, &vertexBufferDescriptorRange };
+		vertexBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 		//Create Root Parameter Array
-		D3D12_ROOT_PARAMETER rootParameters[5] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, vertexBufferRootParameter, bvhNodeBufferRootParameter };
+		D3D12_ROOT_PARAMETER rootParameters[6] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter };
 
 		//Create Root Signature Descriptor Structure
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDescriptor;
@@ -480,7 +495,7 @@ namespace Graphics
 		}
 	}
 
-	void Graphics::UpdateVertexBuffer()
+	void Graphics::UpdateTriangleBuffer()
 	{
 		HRESULT hr;
 
@@ -496,8 +511,8 @@ namespace Graphics
 
 				CD3DX12_RESOURCE_DESC resourceDescription = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
 
-				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&vertexBuffer)));
-				vertexDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&triangleBuffer)));
+				triangleDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 
 				D3D12_SHADER_RESOURCE_VIEW_DESC bufferDescriptor;
 				ZeroMemory(&bufferDescriptor, sizeof(bufferDescriptor));
@@ -507,15 +522,50 @@ namespace Graphics
 				bufferDescriptor.Buffer = { 0, (UINT)triangleData.size(), elementSize, D3D12_BUFFER_SRV_FLAG_NONE };
 
 				static UINT descriptorSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				pDevice->CreateShaderResourceView(vertexBuffer.Get(), &bufferDescriptor, vertexDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+				pDevice->CreateShaderResourceView(triangleBuffer.Get(), &bufferDescriptor, triangleDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 				heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&triangleUploadBuffer)));
+
+				void* pData;
+				GFX_THROW_INFO(triangleUploadBuffer->Map(0, NULL, &pData));
+				memcpy(pData, triangleData.data(), bufferSize);
+				triangleUploadBuffer->Unmap(0, NULL);
+				pCommandList->CopyBufferRegion(triangleBuffer.Get(), 0, triangleUploadBuffer.Get(), 0, bufferSize);
+				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(triangleBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				pCommandList->ResourceBarrier(1, &barrier);
+			}
+
+			{
+				//Update Vertex Data
+				std::vector<Mesh::Vertex> vertexData = meshManager->GetVertexArray();
+
+				UINT elementSize{ static_cast<UINT>(sizeof(Mesh::Vertex)) };
+				UINT bufferSize{ static_cast<UINT>(vertexData.size() * elementSize) };
+
+				D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
+				CD3DX12_RESOURCE_DESC resourceDescription = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&vertexBuffer)));
+				vertexDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC bufferDescriptor;
+				ZeroMemory(&bufferDescriptor, sizeof(bufferDescriptor));
+				bufferDescriptor.Format = DXGI_FORMAT_UNKNOWN;
+				bufferDescriptor.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				bufferDescriptor.Buffer = { 0, (UINT)vertexData.size(), elementSize, 0, D3D12_BUFFER_UAV_FLAG_NONE };
+
+				static UINT descriptorSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				pDevice->CreateUnorderedAccessView(vertexBuffer.Get(), nullptr, &bufferDescriptor, vertexDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+				heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+				resourceDescription.Flags = D3D12_RESOURCE_FLAG_NONE;
 
 				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexUploadBuffer)));
 
 				void* pData;
 				GFX_THROW_INFO(vertexUploadBuffer->Map(0, NULL, &pData));
-				memcpy(pData, triangleData.data(), bufferSize);
+				memcpy(pData, vertexData.data(), bufferSize);
 				vertexUploadBuffer->Unmap(0, NULL);
 				pCommandList->CopyBufferRegion(vertexBuffer.Get(), 0, vertexUploadBuffer.Get(), 0, bufferSize);
 				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -551,7 +601,7 @@ namespace Graphics
 				void* pData;
 				GFX_THROW_INFO(boundingVolumeHierarchyUploadBuffer->Map(0, NULL, &pData));
 				memcpy(pData, boundingVolumeHierarchy->GetTreeData().nodeHierarchy.data(), bvhNodeBufferSize);
-				vertexUploadBuffer->Unmap(0, NULL);
+				boundingVolumeHierarchyUploadBuffer->Unmap(0, NULL);
 				pCommandList->CopyBufferRegion(boundingVolumeHierarchyBuffer.Get(), 0, boundingVolumeHierarchyUploadBuffer.Get(), 0, bvhNodeBufferSize);
 				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(boundingVolumeHierarchyBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 				pCommandList->ResourceBarrier(1, &barrier);
@@ -669,15 +719,19 @@ namespace Graphics
 		GFX_THROW_INFO(pCommandList->Reset(pCommandAllocator.Get(), pRenderPipelineState.Get()));
 
 		UpdateUIBuffer();
-		UpdateVertexBuffer();
+		UpdateTriangleBuffer();
 
 		//Set root signature
 		pCommandList->SetComputeRootSignature(pRootSignature.Get());
 
-		//Bind Triangle buffer, Node Hierarchy, Render Texture, and UI buffer
+		//Bind Triangle buffer, Vertex Buffer, Node Hierarchy, Render Texture, and UI buffer
+		auto triangleBufferHeap = triangleDescriptorHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &triangleBufferHeap);
+		pCommandList->SetComputeRootDescriptorTable(3, triangleBufferHeap->GetGPUDescriptorHandleForHeapStart());
+
 		auto vertexBufferHeap = vertexDescriptorHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &vertexBufferHeap);
-		pCommandList->SetComputeRootDescriptorTable(3, vertexBufferHeap->GetGPUDescriptorHandleForHeapStart());
+		pCommandList->SetComputeRootDescriptorTable(5, vertexBufferHeap->GetGPUDescriptorHandleForHeapStart());
 
 		auto bvhBufferHeap = boundingVolumeHierarchyDescriptorHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &bvhBufferHeap);

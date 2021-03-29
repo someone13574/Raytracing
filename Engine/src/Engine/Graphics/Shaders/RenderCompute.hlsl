@@ -2,8 +2,14 @@
 
 struct Triangle
 {
+	uint indices1;
+	uint indices2;
 	float normal[3];
-	float vertexPositions[3][3];
+};
+struct Vertex
+{
+	float position[3];
+	float UV[2];
 };
 
 struct BVHNode
@@ -32,6 +38,7 @@ struct RayHit
 
 RWTexture2D<float4> result : register(u0);
 RWStructuredBuffer<BVHNode> nodeHierarchy : register(u1);
+RWStructuredBuffer<Vertex> vertexBuffer : register(u2);
 
 struct UIElement
 {
@@ -71,7 +78,7 @@ float4 triIntersect(float3 origin, float3 rayDirection, float3 v0, float3 v1, fl
 	float3 v2v0 = v2 - v0;
 	float3 n = cross(v1v0, v2v0);
 	float d = dot(rayDirection, n);
-	if (d > 0.0000001) return 1.#INF;
+	if (abs(d) < 0.0000001) return 1.#INF;
 	d = 1.0 / d;
 	float3 q = cross(origin - v0, rayDirection);
 	float u = d * dot(-q, v2v0);
@@ -149,8 +156,11 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 			}
 			else
 			{
-				float vertexPositions[3][3] = triangleBuffer[node.triangleIndex].vertexPositions;
-				float4 intersect = triIntersect(rayOrigin, rayDirection, (float3)vertexPositions[0], (float3)vertexPositions[1], (float3)vertexPositions[2]);
+				uint index1 = (triangleBuffer[node.triangleIndex].indices1 & 0x000fffff);
+				uint index2 = ((triangleBuffer[node.triangleIndex].indices1 & 0xfff00000) >> 20) | ((triangleBuffer[node.triangleIndex].indices2 & 0x00000ff) << 12);
+				uint index3 = ((triangleBuffer[node.triangleIndex].indices2 & 0x0fffff00) >> 8);
+
+				float4 intersect = triIntersect(rayOrigin, rayDirection, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position);
 				if (intersect.x < hit.distance)
 				{
 					hit.distance = intersect.x;

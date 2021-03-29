@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 namespace MeshManagement
 {
@@ -18,6 +19,8 @@ namespace MeshManagement
 			std::vector<Mesh> meshArray;
 			Mesh* currentMesh = nullptr;
 			Mesh::Triangle currentTriangle;
+			Mesh::UncompressedTriangle currentUncompressedTriangle;
+			Mesh::Vertex currentVertices[3];
 
 			std::string currentLine;
 
@@ -57,6 +60,7 @@ namespace MeshManagement
 								if (tokenIndex >= 0)
 								{
 									currentTriangle.normal[tokenIndex] = std::stof(intermediate);
+									currentUncompressedTriangle.normal[tokenIndex] = std::stof(intermediate);
 								}
 								tokenIndex++;
 							}
@@ -79,7 +83,8 @@ namespace MeshManagement
 									{
 										if (tokenIndex >= 0)
 										{
-											currentTriangle.vertexPositions[i][tokenIndex] = std::stof(intermediate);
+											currentVertices[i].position[tokenIndex] = std::stof(intermediate);
+											currentUncompressedTriangle.vertices[i].position[tokenIndex] = std::stof(intermediate);
 										}
 										tokenIndex++;
 									}
@@ -87,7 +92,41 @@ namespace MeshManagement
 							}
 							else
 							{
+								uint64_t vertexIndices[3];
+								unsigned int indices1 = 0x00000000;
+								unsigned int indices2 = 0x00000000;
+								for (unsigned int i = 0; i < 3; i++)
+								{
+									auto it = std::find(currentMesh->vertices.begin(), currentMesh->vertices.end(), currentVertices[i]);
+									if (it != currentMesh->vertices.end()) //Test if the mesh already has this vertex
+									{
+										vertexIndices[i] = it - currentMesh->vertices.begin();
+									}
+									else
+									{
+										currentMesh->vertices.push_back(currentVertices[i]);
+										vertexIndices[i] = currentMesh->vertices.size() - 1;
+									}
+									if (i == 0)
+									{
+										indices1 = indices1 | (vertexIndices[i] & 0x000fffff);
+									}
+									else if (i == 1)
+									{
+										indices1 = indices1 | ((vertexIndices[i] << 20) & 0xfff00000);
+										indices2 = indices2 | ((vertexIndices[i] >> 12) & 0x000000ff);
+									}
+									else if (i == 2)
+									{
+										indices2 = indices2 | ((vertexIndices[i] << 8) & 0x0fffff00);
+									}
+								}
+
+								currentTriangle.indices1 = indices1;
+								currentTriangle.indices2 = indices2;
+
 								currentMesh->triangles.push_back(currentTriangle);
+								currentMesh->uncompressedTriangles.push_back(currentUncompressedTriangle);
 							}
 						}
 					}
