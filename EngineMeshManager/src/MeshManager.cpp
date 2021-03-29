@@ -2,6 +2,7 @@
 #include "EngineLogger.h"
 
 #include <string>
+#include <ctime>
 
 namespace MeshManagement
 {
@@ -19,7 +20,11 @@ namespace MeshManagement
 			pathstr.erase(0, extensionIndex + 1);
 			if (pathstr == "stl")
 			{
+
+				float timeStart = float(clock()) / CLOCKS_PER_SEC;
 				std::vector<Mesh> readFileResult = MeshDecoder::ReadAsciiStl(path);
+				DEBUGLOG((float(clock()) / CLOCKS_PER_SEC) - timeStart);
+
 				meshes.insert(meshes.end(), readFileResult.begin(), readFileResult.end());
 				upToDate = false;
 			}

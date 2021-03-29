@@ -88,6 +88,9 @@ namespace MeshManagement
 										}
 										tokenIndex++;
 									}
+
+									currentVertices[i].UV[0] = 0;
+									currentVertices[i].UV[1] = 0;
 								}
 							}
 							else
@@ -97,16 +100,22 @@ namespace MeshManagement
 								unsigned int indices2 = 0x00000000;
 								for (unsigned int i = 0; i < 3; i++)
 								{
-									auto it = std::find(currentMesh->vertices.begin(), currentMesh->vertices.end(), currentVertices[i]);
-									if (it != currentMesh->vertices.end()) //Test if the mesh already has this vertex
+									bool foundDuplicate = false;
+									for (unsigned int n = 0; n < currentMesh->vertices.size(); n++)
 									{
-										vertexIndices[i] = it - currentMesh->vertices.begin();
+										if (abs(currentMesh->vertices[n].position[0] - currentVertices[i].position[0]) < 0.1 && abs(currentMesh->vertices[n].position[1] - currentVertices[i].position[1]) < 0.1 && abs(currentMesh->vertices[n].position[2] - currentVertices[i].position[2]) < 0.1)
+										{
+											vertexIndices[i] = n;
+											foundDuplicate = true;
+											break;
+										}
 									}
-									else
+									if (!foundDuplicate)
 									{
 										currentMesh->vertices.push_back(currentVertices[i]);
 										vertexIndices[i] = currentMesh->vertices.size() - 1;
 									}
+
 									if (i == 0)
 									{
 										indices1 = indices1 | (vertexIndices[i] & 0x000fffff);
