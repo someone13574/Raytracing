@@ -12,11 +12,6 @@ public:
 	{
 		float position[3];
 		float UV[2];
-
-		bool operator==(Vertex rhs)
-		{
-			return (position == rhs.position) && (UV == rhs.UV);
-		}
 	};
 	struct Triangle
 	{
