@@ -25,6 +25,8 @@ public:
 		float normal[3];
 	};
 public:
+	void AddTriangle(Vertex vertices[3], float normal[3]);
+public:
 	bool completed = false;
 public:
 #pragma warning(push)

@@ -2,6 +2,7 @@
 #include "EngineLogger.h"
 
 #include <string>
+#include <sstream>
 #include <ctime>
 
 namespace MeshManagement
@@ -13,6 +14,12 @@ namespace MeshManagement
 
 	void MeshManager::ReadMeshFile(const char* path)
 	{
+		{
+			std::ostringstream oss;
+			oss << "Reading Mesh File " << path;
+			DEBUGLOG(oss.str());
+		}
+
 		std::string pathstr = std::string(path);
 		size_t extensionIndex = pathstr.find_last_of('.');
 		if (extensionIndex != std::string::npos)
@@ -20,13 +27,17 @@ namespace MeshManagement
 			pathstr.erase(0, extensionIndex + 1);
 			if (pathstr == "stl")
 			{
-
-				float timeStart = float(clock()) / CLOCKS_PER_SEC;
+				double timeStart = (double)clock() / CLOCKS_PER_SEC;
 				std::vector<Mesh> readFileResult = MeshDecoder::ReadAsciiStl(path);
-				DEBUGLOG((float(clock()) / CLOCKS_PER_SEC) - timeStart);
 
 				meshes.insert(meshes.end(), readFileResult.begin(), readFileResult.end());
 				upToDate = false;
+
+				{
+					std::ostringstream oss;
+					oss << "Finished Reading Mesh File. Task time: " << ((double)clock() / CLOCKS_PER_SEC) - timeStart << " seconds";
+					DEBUGLOG(oss.str())
+				}
 			}
 			else
 			{

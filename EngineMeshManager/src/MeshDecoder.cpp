@@ -18,9 +18,9 @@ namespace MeshManagement
 		{
 			std::vector<Mesh> meshArray;
 			Mesh* currentMesh = nullptr;
-			Mesh::Triangle currentTriangle;
-			Mesh::UncompressedTriangle currentUncompressedTriangle;
+
 			Mesh::Vertex currentVertices[3];
+			float normal[3] = { 0, 0, 0 };
 
 			std::string currentLine;
 
@@ -59,8 +59,7 @@ namespace MeshManagement
 							{
 								if (tokenIndex >= 0)
 								{
-									currentTriangle.normal[tokenIndex] = std::stof(intermediate);
-									currentUncompressedTriangle.normal[tokenIndex] = std::stof(intermediate);
+									normal[tokenIndex] = std::stof(intermediate);
 								}
 								tokenIndex++;
 							}
@@ -84,7 +83,6 @@ namespace MeshManagement
 										if (tokenIndex >= 0)
 										{
 											currentVertices[i].position[tokenIndex] = std::stof(intermediate);
-											currentUncompressedTriangle.vertices[i].position[tokenIndex] = std::stof(intermediate);
 										}
 										tokenIndex++;
 									}
@@ -95,47 +93,7 @@ namespace MeshManagement
 							}
 							else
 							{
-								uint64_t vertexIndices[3];
-								unsigned int indices1 = 0x00000000;
-								unsigned int indices2 = 0x00000000;
-								for (unsigned int i = 0; i < 3; i++)
-								{
-									bool foundDuplicate = false;
-									for (unsigned int n = 0; n < currentMesh->vertices.size(); n++)
-									{
-										if (abs(currentMesh->vertices[n].position[0] - currentVertices[i].position[0]) < 0.1 && abs(currentMesh->vertices[n].position[1] - currentVertices[i].position[1]) < 0.1 && abs(currentMesh->vertices[n].position[2] - currentVertices[i].position[2]) < 0.1)
-										{
-											vertexIndices[i] = n;
-											foundDuplicate = true;
-											break;
-										}
-									}
-									if (!foundDuplicate)
-									{
-										currentMesh->vertices.push_back(currentVertices[i]);
-										vertexIndices[i] = currentMesh->vertices.size() - 1;
-									}
-
-									if (i == 0)
-									{
-										indices1 = indices1 | (vertexIndices[i] & 0x000fffff);
-									}
-									else if (i == 1)
-									{
-										indices1 = indices1 | ((vertexIndices[i] << 20) & 0xfff00000);
-										indices2 = indices2 | ((vertexIndices[i] >> 12) & 0x000000ff);
-									}
-									else if (i == 2)
-									{
-										indices2 = indices2 | ((vertexIndices[i] << 8) & 0x0fffff00);
-									}
-								}
-
-								currentTriangle.indices1 = indices1;
-								currentTriangle.indices2 = indices2;
-
-								currentMesh->triangles.push_back(currentTriangle);
-								currentMesh->uncompressedTriangles.push_back(currentUncompressedTriangle);
+								currentMesh->AddTriangle(currentVertices, normal);
 							}
 						}
 					}
