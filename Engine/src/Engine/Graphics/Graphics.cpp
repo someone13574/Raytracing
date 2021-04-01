@@ -14,7 +14,7 @@
 
 namespace Graphics
 {
-	Graphics::Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager, BoundingVolumeHierarchy* boundingVolumeHierarchy) : clientWidth(width), clientHeight(height), wnd(window), uiManager(UIManager(mouse)), meshManager(meshManager), boundingVolumeHierarchy(boundingVolumeHierarchy)
+	Graphics::Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager) : clientWidth(width), clientHeight(height), wnd(window), uiManager(UIManager(mouse)), meshManager(meshManager)
 	{
 		LoadPipeline();
 		LoadAssets();
@@ -306,9 +306,9 @@ namespace Graphics
 		flags |= D3DCOMPILE_DEBUG;
 #endif
 		char buffer[8];
-		_itoa_s(boundingVolumeHierarchy->GetMaxStackSize(), buffer, 8, 10);
+		_itoa_s(meshManager->GetMesh(0).GetMaxStackSize(), buffer, 8, 10);
 		std::string maxStackSizeStr = std::string(buffer);
-		_itoa_s(boundingVolumeHierarchy->GetTreeData().rootIndex, buffer, 8, 10);
+		_itoa_s(meshManager->GetMesh(0).rootIndex, buffer, 8, 10);
 		std::string rootNodeIndexStr = std::string(buffer);
 
 		D3D_SHADER_MACRO maxStackSizeMacro = { "MAX_STACK_SIZE", maxStackSizeStr.c_str() };
@@ -574,8 +574,8 @@ namespace Graphics
 
 			{
 				//Update BVH
-				UINT bvhElementSize{ static_cast<UINT>(sizeof(BoundingVolumeHierarchy::Node)) };
-				UINT bvhNodeBufferSize{ static_cast<UINT>(boundingVolumeHierarchy->GetTreeData().nodeHierarchy.size() * bvhElementSize) };
+				UINT bvhElementSize{ static_cast<UINT>(sizeof(Mesh::Node)) };
+				UINT bvhNodeBufferSize{ static_cast<UINT>(meshManager->GetMesh(0).nodeHierarchy.size() * bvhElementSize) };
 
 				D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
 
@@ -588,7 +588,7 @@ namespace Graphics
 				ZeroMemory(&bufferDescriptor, sizeof(bufferDescriptor));
 				bufferDescriptor.Format = DXGI_FORMAT_UNKNOWN;
 				bufferDescriptor.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-				bufferDescriptor.Buffer = { 0, (UINT)boundingVolumeHierarchy->GetTreeData().nodeHierarchy.size(), bvhElementSize, 0, D3D12_BUFFER_UAV_FLAG_NONE };
+				bufferDescriptor.Buffer = { 0, (UINT)meshManager->GetMesh(0).nodeHierarchy.size(), bvhElementSize, 0, D3D12_BUFFER_UAV_FLAG_NONE };
 
 				static UINT descriptorSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				pDevice->CreateUnorderedAccessView(boundingVolumeHierarchyBuffer.Get(), nullptr, &bufferDescriptor, boundingVolumeHierarchyDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
@@ -600,7 +600,7 @@ namespace Graphics
 
 				void* pData;
 				GFX_THROW_INFO(boundingVolumeHierarchyUploadBuffer->Map(0, NULL, &pData));
-				memcpy(pData, boundingVolumeHierarchy->GetTreeData().nodeHierarchy.data(), bvhNodeBufferSize);
+				memcpy(pData, meshManager->GetMesh(0).nodeHierarchy.data(), bvhNodeBufferSize);
 				boundingVolumeHierarchyUploadBuffer->Unmap(0, NULL);
 				pCommandList->CopyBufferRegion(boundingVolumeHierarchyBuffer.Get(), 0, boundingVolumeHierarchyUploadBuffer.Get(), 0, bvhNodeBufferSize);
 				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(boundingVolumeHierarchyBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

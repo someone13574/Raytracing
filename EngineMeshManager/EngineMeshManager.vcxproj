@@ -91,13 +91,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\BoundingVolumeHierarchy.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\MeshDecoder.cpp" />
     <ClCompile Include="src\MeshManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\BoundingVolumeHierarchy.h" />
     <ClInclude Include="src\Mesh.h" />
     <ClInclude Include="src\MeshDecoder.h" />
     <ClInclude Include="src\MeshManager.h" />

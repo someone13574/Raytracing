@@ -6,8 +6,6 @@
 #include "Input/Mouse.h"
 
 #include "Graphics/Graphics.h"
-
-#include "BoundingVolumeHierarchy.h"
 #include "MeshManager.h"
 
 #include <optional>
@@ -50,7 +48,6 @@ namespace Engine
 		HWND window;
 
 		MeshManagement::MeshManager meshManager;
-		BoundingVolumeHierarchy boundingVolumeHierarchy;
 	private:
 		static LRESULT CALLBACK HandleMsgSetup(HWND window, UINT messgage, WPARAM wParam, LPARAM lParam);
 		static LRESULT CALLBACK HandleMsgThunk(HWND window, UINT message, WPARAM wParam, LPARAM lParam);

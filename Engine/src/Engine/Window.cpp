@@ -49,7 +49,6 @@ namespace Engine
 	Window::Window(int width, int height, const char* name) : width(width), height(height)
 	{
 		meshManager.ReadMeshFile("C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/Dragon50k.stl");
-		boundingVolumeHierarchy = BoundingVolumeHierarchy(meshManager.GetMesh(0));
 
 		try
 		{
@@ -57,7 +56,7 @@ namespace Engine
 			if (window == nullptr)
 				WND_LAST_EXCEPT();
 			ShowWindow(window, SW_SHOWDEFAULT);
-			pGraphics = std::make_unique<Graphics::Graphics>(window, &mouse, width, height, &meshManager, &boundingVolumeHierarchy);
+			pGraphics = std::make_unique<Graphics::Graphics>(window, &mouse, width, height, &meshManager);
 		}
 		catch (const EngineExcept::EngineException& e)
 		{

@@ -6,7 +6,6 @@
 
 #include "UIManager.h"
 #include "MeshManager.h"
-#include "BoundingVolumeHierarchy.h"
 #include "Camera.h"
 
 #include <d3d12.h>
@@ -40,14 +39,13 @@ namespace Graphics
 	class ENGINE_DLL_DS Graphics
 	{
 	public:
-		Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager, BoundingVolumeHierarchy* boundingVolumeHierarchy);
+		Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager);
 		~Graphics();
 		Graphics(const Graphics&) = delete;
 		Graphics& operator = (const Graphics&) = delete;
 	public:
 		UIManager uiManager;
 		MeshManagement::MeshManager* meshManager = nullptr;
-		BoundingVolumeHierarchy* boundingVolumeHierarchy = nullptr;
 	public:
 		bool pipelineObjectsInitialized = false;
 
