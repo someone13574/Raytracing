@@ -1,3 +1,3 @@
-[--Log--][20:44:21][enginelogger.cpp, 013]   Cleared Log!
-[--Log--][20:44:21][meshmanager.cpp, 020]   Reading Mesh File C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/Dragon50k.stl
-[--Log--][20:44:23][meshmanager.cpp, 039]   Finished Reading Mesh File. Task time: 2.252 seconds
+[--Log--][16:11:0][enginelogger.cpp, 013]   Cleared Log!
+[--Log--][16:11:0][meshmanager.cpp, 020]   Reading Mesh File C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/Dragon50k.stl
+[--Log--][16:11:2][meshmanager.cpp, 039]   Finished Reading Mesh File. Task time: 1.968 seconds

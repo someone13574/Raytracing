@@ -41,6 +41,21 @@ namespace MeshManagement
 					{
 						if (currentMesh != nullptr)
 						{
+							for (unsigned int vert = 0; vert < (unsigned int)currentMesh->vertices.size(); vert++) //Loop through all vertices and divide sum of triangle normals by count of triangle normals
+							{
+								unsigned short int numberOfUses = currentMesh->vertexUsedCount[vert];
+
+								currentMesh->vertices[vert].normal[0] /= (float)numberOfUses;
+								currentMesh->vertices[vert].normal[1] /= (float)numberOfUses;
+								currentMesh->vertices[vert].normal[2] /= (float)numberOfUses;
+
+								//Normalize
+								double magnitude = sqrt((currentMesh->vertices[vert].normal[0] * currentMesh->vertices[vert].normal[0]) + (currentMesh->vertices[vert].normal[1] * currentMesh->vertices[vert].normal[1]) + (currentMesh->vertices[vert].normal[2] * currentMesh->vertices[vert].normal[2]));
+								currentMesh->vertices[vert].normal[0] /= (float)magnitude;
+								currentMesh->vertices[vert].normal[1] /= (float)magnitude;
+								currentMesh->vertices[vert].normal[2] /= (float)magnitude;
+							}
+
 							currentMesh->completed = true;
 						}
 					}
@@ -89,11 +104,15 @@ namespace MeshManagement
 
 									currentVertices[i].UV[0] = 0;
 									currentVertices[i].UV[1] = 0;
+
+									currentVertices[i].normal[0] = normal[0];
+									currentVertices[i].normal[1] = normal[1];
+									currentVertices[i].normal[2] = normal[2];
 								}
 							}
 							else
 							{
-								currentMesh->AddTriangle(currentVertices, normal);
+								currentMesh->AddTriangle(currentVertices);
 							}
 						}
 					}

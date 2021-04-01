@@ -11,13 +11,13 @@ public:
 	struct Vertex
 	{
 		float position[3];
+		float normal[3];
 		float UV[2];
 	};
 	struct Triangle
 	{
 		unsigned int indices1;
 		unsigned int indices2;
-		float normal[3];
 	};
 	struct AABB
 	{
@@ -39,13 +39,8 @@ public:
 		AABB aabb;
 		int isLeaf;
 	};
-	struct UncompressedTriangle
-	{
-		Vertex vertices[3];
-		float normal[3];
-	};
 public:
-	void AddTriangle(Vertex vertices[3], float normal[3]);
+	void AddTriangle(Vertex vertices[3]);
 	unsigned int GetMaxStackSize();
 public:
 	bool completed = false;
@@ -55,8 +50,8 @@ public:
 #pragma warning(disable:4251)
 	std::string meshName;
 	std::vector<Vertex> vertices;
+	std::vector<unsigned short int> vertexUsedCount;
 	std::vector<Triangle> triangles;
-	std::vector<UncompressedTriangle> uncompressedTriangles;
 	std::vector<Node> nodeHierarchy;
 #pragma warning(pop)
 };

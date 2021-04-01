@@ -4,11 +4,11 @@ struct Triangle
 {
 	uint indices1;
 	uint indices2;
-	float normal[3];
 };
 struct Vertex
 {
 	float position[3];
+	float normal[3];
 	float UV[2];
 };
 
@@ -164,7 +164,7 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 				if (intersect.x < hit.distance)
 				{
 					hit.distance = intersect.x;
-					hit.normal = (float3)triangleBuffer[node.triangleIndex].normal;
+					hit.normal = ((float3)vertexBuffer[index2].normal * intersect.y) + ((float3)vertexBuffer[index3].normal * intersect.z) + ((float3)vertexBuffer[index1].normal * intersect.w);
 					hit.color = hit.normal;
 				}
 			}

@@ -4,10 +4,9 @@
 
 Mesh::Mesh(std::string name) : meshName(name) {}
 
-void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3], float normal[3])
+void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3])
 {
 	Triangle triangle;
-	UncompressedTriangle uncompressedTriangle;
 
 	unsigned int indices1 = 0x00000000; //The first 32 bit number containing the first and second vertices
 	unsigned int indices2 = 0x00000000; //The second 32 bit number containing the second and third vertices
@@ -27,7 +26,13 @@ void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3], float normal[3])
 				if (isDuplicate) //Test if this vertex already exists in a different triangle
 				{
 					vertexIndex = (unsigned int)index;
+					vertexUsedCount[index] += 1;
 					foundDuplicate = true;
+
+					vertices[index].normal[0] += triangleVertices[vert].normal[0];
+					vertices[index].normal[1] += triangleVertices[vert].normal[1];
+					vertices[index].normal[2] += triangleVertices[vert].normal[2];
+
 					break;
 				}
 			}
@@ -36,6 +41,7 @@ void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3], float normal[3])
 		{
 			vertexIndex = (unsigned int)vertices.size();
 			vertices.push_back(triangleVertices[vert]);
+			vertexUsedCount.push_back(1);
 		}
 		if (vert == 0)
 		{
@@ -54,16 +60,8 @@ void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3], float normal[3])
 
 	triangle.indices1 = indices1;
 	triangle.indices2 = indices2;
-	triangle.normal[0] = normal[0];
-	triangle.normal[1] = normal[1];
-	triangle.normal[2] = normal[2];
-
-	uncompressedTriangle.vertices[0] = triangleVertices[0];
-	uncompressedTriangle.vertices[1] = triangleVertices[1];
-	uncompressedTriangle.vertices[2] = triangleVertices[2];
 
 	triangles.push_back(triangle);
-	uncompressedTriangles.push_back(uncompressedTriangle);
 
 	//Add to bounding volume hierarchy
 	{
