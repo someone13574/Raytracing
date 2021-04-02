@@ -48,7 +48,7 @@ namespace Engine
 	//Window
 	Window::Window(int width, int height, const char* name) : width(width), height(height)
 	{
-		meshManager.ReadMeshFile("C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/Dragon50k.stl");
+		meshManager.ReadMeshFile("C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/ObjTest.obj");
 
 		try
 		{

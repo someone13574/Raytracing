@@ -33,11 +33,22 @@ namespace MeshManagement
 				meshes.insert(meshes.end(), readFileResult.begin(), readFileResult.end());
 				upToDate = false;
 
-				{
-					std::ostringstream oss;
-					oss << "Finished Reading Mesh File. Task time: " << ((double)clock() / CLOCKS_PER_SEC) - timeStart << " seconds";
-					DEBUGLOG(oss.str())
-				}
+				std::ostringstream oss;
+				oss << "Finished Reading Mesh File. Task time: " << ((double)clock() / CLOCKS_PER_SEC) - timeStart << " seconds";
+				DEBUGLOG(oss.str())
+			}
+			else if (pathstr == "obj")
+			{
+				double timeStart = (double)clock() / CLOCKS_PER_SEC;
+
+				Mesh readFileResult = MeshDecoder::ReadObj(path);
+
+				meshes.push_back(readFileResult);
+				upToDate = false;
+
+				std::ostringstream oss;
+				oss << "Finished Reading Mesh File. Task time: " << ((double)clock() / CLOCKS_PER_SEC) - timeStart << " seconds";
+				DEBUGLOG(oss.str())
 			}
 			else
 			{

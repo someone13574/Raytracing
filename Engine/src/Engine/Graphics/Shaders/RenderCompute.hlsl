@@ -165,7 +165,7 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 				{
 					hit.distance = intersect.x;
 					hit.normal = ((float3)vertexBuffer[index2].normal * intersect.y) + ((float3)vertexBuffer[index3].normal * intersect.z) + ((float3)vertexBuffer[index1].normal * intersect.w);
-					hit.color = hit.normal;
+					hit.color = float3(1, 1, 1);
 				}
 			}
 		}
@@ -203,5 +203,5 @@ void main(uint2 id : SV_DispatchThreadID)
 
 	float diffuse = saturate(dot(hit.normal, lightDir));
 	float lighting = saturate(diffuse + 0.05);
-	result[id] = float4(hit.color, 1);
+	result[id] = float4(hit.color * lighting, 1);
 }

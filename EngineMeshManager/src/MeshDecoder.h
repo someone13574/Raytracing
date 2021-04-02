@@ -10,5 +10,6 @@ namespace MeshManagement
 	{
 	public:
 		static std::vector<Mesh> ReadAsciiStl(const char* path);
+		static Mesh ReadObj(const char* path);
 	};
 }
