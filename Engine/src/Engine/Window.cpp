@@ -46,7 +46,7 @@ namespace Engine
 	}
 
 	//Window
-	Window::Window(int width, int height, const char* name) : width(width), height(height)
+	Window::Window(int width, int height, const char* name) : width(width), height(height), mouse(Input::Mouse())
 	{
 		meshManager.ReadMeshFile("C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/ObjTest.obj");
 

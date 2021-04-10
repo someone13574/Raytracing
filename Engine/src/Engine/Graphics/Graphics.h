@@ -26,6 +26,7 @@ namespace Graphics
 	struct RenderConstants
 	{
 		float time;
+		unsigned int frame;
 		unsigned int width;
 		unsigned int height;
 
@@ -33,7 +34,17 @@ namespace Graphics
 		float originY;
 		float originZ;
 
-		Matrix3x3<double>::GPUMatrix3x3 cameraToWorldMatrix;
+		float previousOriginX;
+		float previousOriginY;
+		float previousOriginZ;
+
+		float padding1, padding2;
+
+		float mat[9];
+
+		float padding4, padding5, padding6;
+
+		float previousMatrix[9];
 	};
 
 	class ENGINE_DLL_DS Graphics
@@ -46,6 +57,7 @@ namespace Graphics
 	public:
 		UIManager uiManager;
 		MeshManagement::MeshManager* meshManager = nullptr;
+		Input::Mouse* mouse = nullptr;
 	public:
 		bool pipelineObjectsInitialized = false;
 
@@ -66,7 +78,7 @@ namespace Graphics
 		void CreatePipelineStateObjects();
 	private:
 		void CreateBackbuffers();
-		void CreateRenderTexture();
+		void CreateRenderTextures();
 		void UpdateUIBuffer();
 		void UpdateTriangleBuffer();
 	private:
@@ -99,6 +111,12 @@ namespace Graphics
 		ComPtr<ID3D12Resource> pUnorderedAccess;
 		ComPtr<ID3D12DescriptorHeap> pUAVHeap;
 
+		ComPtr<ID3D12Resource> pTempTexture;
+		ComPtr<ID3D12DescriptorHeap> pTempTextureHeap;
+
+		ComPtr<ID3D12Resource> pHistoryBuffer;
+		ComPtr<ID3D12DescriptorHeap> pHistoryBufferHeap;
+
 		ComPtr<ID3D12Resource> uiElementBuffer;
 		ComPtr<ID3D12Resource> uiUploadBuffer;
 		ComPtr<ID3D12DescriptorHeap> uiElementDescriptorHeap;
@@ -130,6 +148,7 @@ namespace Graphics
 		HANDLE fenceEvent;
 
 		Camera camera = Camera();
+		unsigned int currentFrame = 0;
 
 #ifndef NDEBUG
 		EngineDebug::DirectxErrorCatcher errorCatcher;

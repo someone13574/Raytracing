@@ -19,9 +19,9 @@ void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3])
 		{
 			for (long long int index = (long long int)(vertices.size() - 1); index >= 0; index--) //Loop through all current vertices starting at top
 			{
-				bool isDuplicate = (abs(vertices[index].position[0] - triangleVertices[vert].position[0]) < 0.1 &&
-					abs(vertices[index].position[1] - triangleVertices[vert].position[1]) < 0.1 &&
-					abs(vertices[index].position[2] - triangleVertices[vert].position[2]) < 0.1);
+				bool isDuplicate = (abs(vertices[index].position[0] - triangleVertices[vert].position[0]) < 0.001 &&
+					abs(vertices[index].position[1] - triangleVertices[vert].position[1]) < 0.001 &&
+					abs(vertices[index].position[2] - triangleVertices[vert].position[2]) < 0.001);
 
 				if (isDuplicate) //Test if this vertex already exists in a different triangle
 				{

@@ -76,7 +76,7 @@ public:
 	template <typename ScalarType> Vector3<VectorType> operator/=(ScalarType value) { static_assert(std::is_arithmetic<ScalarType>::value, "Cannot divide this vector by this type. It must be numeric."); *this = Vector3<VectorType>(x / (VectorType)value, y / (VectorType)value, z / (VectorType)value); return *this; }
 	template <typename ScalarType> Vector3<VectorType> operator/=(Vector3<ScalarType> vector) { static_assert(std::is_arithmetic<ScalarType>::value, "Vector type must be numeric."); *this = Vector3<VectorType>(x / (VectorType)vector.x, y / (VectorType)vector.y, z / (VectorType)vector.z); return *this; }
 public:
-	Vector3 Normalized() { return *this / sqrt((double)(x * x + y * y + z * z)); }
+	template <typename Type> static Vector3<Type> Normalized(Vector3<Type> v) { return v / sqrt((double)(v.x * v.x + v.y * v.y + v.z * v.z)); }
 	void Normalize() { *this /= sqrt((double)(x * x + y * y + z * z)); }
 	template <typename T>static double Dot(Vector3<T> vector1, Vector3<T> vector2) { return (double)vector1.x * (double)vector2.x + (double)vector1.y * (double)vector2.y + (double)vector1.z * (double)vector2.z; }
 	template <typename T> static Vector3<T> Cross(Vector3<T> u, Vector3<T> v)

@@ -56,15 +56,31 @@ public:
 	template<typename Type> Matrix3x3<MatrixType> operator/(Type scalar) { static_assert(std::is_arithmetic<Type>::value, "Scalar type must be numeric."); return Matrix3x3<MatrixType>(x0 / scalar, y0 / scalar, z0 / scalar, x1 / scalar, y1 / scalar, z1 / scalar, x2 / scalar, y2 / scalar, z2 / scalar); }
 	template<typename Type> Matrix3x3<MatrixType> operator/=(Type scalar) { static_assert(std::is_arithmetic<Type>::value, "Scalar type must be numeric."); *this = Matrix3x3<MatrixType>(x0 / scalar, y0 / scalar, z0 / scalar, x1 / scalar, y1 / scalar, z1 / scalar, x2 / scalar, y2 / scalar, z2 / scalar); return *this; }
 public:
+	template<typename Type> static Matrix3x3<Type> Invert(Matrix3x3<Type> matrix)
+	{
+		double determinant = matrix.Determinant();
+		if (determinant == 0)
+		{
+			return Matrix3x3<Type>(1, 0, 0, 0, 1, 0, 0, 0, 1);
+		}
+		determinant = 1 / determinant;
+
+		Matrix3x3<Type> matrixOfMinors = Matrix3x3<Type>((matrix.y1 * matrix.z2 - matrix.z1 * matrix.y2), -(matrix.x1 * matrix.z2 - matrix.z1 * matrix.x2), (matrix.x1 * matrix.y2 - matrix.y1 * matrix.x2), -(matrix.y0 * matrix.z2 - matrix.z0 * matrix.y2), (matrix.x0 * matrix.z2 - matrix.z0 * matrix.x2), -(matrix.x0 * matrix.y2 - matrix.y0 * matrix.x2), (matrix.y0 * matrix.z1 - matrix.z0 * matrix.y1), -(matrix.x0 * matrix.z1 - matrix.z0 * matrix.x1), (matrix.x0 * matrix.y1 - matrix.y0 * matrix.x1));
+		Matrix3x3<Type> matrixOfMinorsTransposed = Matrix3x3<Type>(matrixOfMinors.x0 * determinant, matrixOfMinors.x1 * determinant, matrixOfMinors.x2 * determinant, matrixOfMinors.y0 * determinant, matrixOfMinors.y1 * determinant, matrixOfMinors.y2 * determinant, matrixOfMinors.z0 * determinant, matrixOfMinors.z1 * determinant, matrixOfMinors.z2 * determinant);
+
+		return matrixOfMinorsTransposed;
+	}
+
+	double Determinant()
+	{
+		return (x0 * y1 * z2) + (y0 * z1 * x2) + (z0 * x1 * y2) - (z0 * y1 * x2) - (x0 * z1 * y2) - (y0 * x1 * z2);
+	}
+public:
 	MatrixType x0, y0, z0;
 	MatrixType x1, y1, z1;
 	MatrixType x2, y2, z2;
-public:
-	struct GPUMatrix3x3
-	{
-		float x0, y0, z0, x1;
-		float y1, z1, x2, y2;
-		float z2;
-	};
-	GPUMatrix3x3 GetGpuMatrix() { return { (float)x0, (float)y0, (float)z0, (float)x1, (float)y1, (float)z1, (float)x2, (float)y2, (float)z2 }; }
+#pragma warning(push)
+#pragma warning(disable:4172)
+	float* GetGpuMatrix() { float matrix[9] = { (float)x0, (float)y0, (float)z0, (float)x1, (float)y1, (float)z1, (float)x2, (float)y2, (float)z2 }; return matrix; }
+#pragma warning(pop)
 };

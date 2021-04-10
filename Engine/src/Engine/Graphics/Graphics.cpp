@@ -14,7 +14,7 @@
 
 namespace Graphics
 {
-	Graphics::Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager) : clientWidth(width), clientHeight(height), wnd(window), uiManager(UIManager(mouse)), meshManager(meshManager)
+	Graphics::Graphics(HWND window, Input::Mouse* mouse, int width, int height, MeshManagement::MeshManager* meshManager) : clientWidth(width), clientHeight(height), wnd(window), uiManager(UIManager(mouse)), meshManager(meshManager), mouse(mouse)
 	{
 		LoadPipeline();
 		LoadAssets();
@@ -62,7 +62,7 @@ namespace Graphics
 			GFX_THROW_INFO(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
 			//Create Device
-			GFX_THROW_INFO(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pDevice)));
+			GFX_THROW_INFO(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&pDevice)));
 		}
 		else
 		{
@@ -210,6 +210,36 @@ namespace Graphics
 		renderTextureRootParameter.DescriptorTable = { 1, &renderTextureDescriptorRange };
 		renderTextureRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+		//Root Parameter temp buffer
+		D3D12_DESCRIPTOR_RANGE tempTextureDescriptorRange;
+		ZeroMemory(&tempTextureDescriptorRange, sizeof(tempTextureDescriptorRange));
+		tempTextureDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		tempTextureDescriptorRange.NumDescriptors = 1;
+		tempTextureDescriptorRange.BaseShaderRegister = 3;
+		tempTextureDescriptorRange.RegisterSpace = 0;
+		tempTextureDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER tempTextureRootParameter;
+		ZeroMemory(&tempTextureRootParameter, sizeof(tempTextureRootParameter));
+		tempTextureRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		tempTextureRootParameter.DescriptorTable = { 1, &tempTextureDescriptorRange };
+		tempTextureRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter reprojection buffer
+		D3D12_DESCRIPTOR_RANGE reprojectionBufferDescriptorRange;
+		ZeroMemory(&reprojectionBufferDescriptorRange, sizeof(reprojectionBufferDescriptorRange));
+		reprojectionBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		reprojectionBufferDescriptorRange.NumDescriptors = 1;
+		reprojectionBufferDescriptorRange.BaseShaderRegister = 4;
+		reprojectionBufferDescriptorRange.RegisterSpace = 0;
+		reprojectionBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER reprojectionBufferRootParameter;
+		ZeroMemory(&reprojectionBufferRootParameter, sizeof(reprojectionBufferRootParameter));
+		reprojectionBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		reprojectionBufferRootParameter.DescriptorTable = { 1, &reprojectionBufferDescriptorRange };
+		reprojectionBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 		//Root Parameter for UI Element Buffer
 		D3D12_DESCRIPTOR_RANGE uiDescriptorRange;
 		ZeroMemory(&uiDescriptorRange, sizeof(uiDescriptorRange));
@@ -278,7 +308,7 @@ namespace Graphics
 		vertexBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Create Root Parameter Array
-		D3D12_ROOT_PARAMETER rootParameters[6] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter };
+		D3D12_ROOT_PARAMETER rootParameters[8] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter, tempTextureRootParameter, reprojectionBufferRootParameter };
 
 		//Create Root Signature Descriptor Structure
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDescriptor;
@@ -301,20 +331,15 @@ namespace Graphics
 		HRESULT hr;
 
 		//Compile
-		UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3; //D3DCOMPILE_WARNINGS_ARE_ERRORS
-#ifndef NDEBUG
-		flags |= D3DCOMPILE_DEBUG;
-#endif
+		UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_DEBUG; //D3DCOMPILE_WARNINGS_ARE_ERRORS
+
 		char buffer[8];
-		_itoa_s(meshManager->GetMesh(0).GetMaxStackSize(), buffer, 8, 10);
-		std::string maxStackSizeStr = std::string(buffer);
 		_itoa_s(meshManager->GetMesh(0).rootIndex, buffer, 8, 10);
 		std::string rootNodeIndexStr = std::string(buffer);
 
-		D3D_SHADER_MACRO maxStackSizeMacro = { "MAX_STACK_SIZE", maxStackSizeStr.c_str() };
 		D3D_SHADER_MACRO rootNodeIndexMacro = { "ROOT_NODE_INDEX", rootNodeIndexStr.c_str() };
 
-		D3D_SHADER_MACRO defines[] = { maxStackSizeMacro, rootNodeIndexMacro, { NULL, NULL } };
+		D3D_SHADER_MACRO defines[] = { rootNodeIndexMacro,  { NULL, NULL } };
 
 		ID3DBlob* shaderBlob = nullptr;
 		ID3DBlob* errorBlob = nullptr;
@@ -358,7 +383,7 @@ namespace Graphics
 	void Graphics::LoadAssets()
 	{
 		CreateBackbuffers();
-		CreateRenderTexture();
+		CreateRenderTextures();
 
 		WaitForPreviousFrame();
 	}
@@ -399,43 +424,121 @@ namespace Graphics
 		}
 	}
 
-	void Graphics::CreateRenderTexture()
+	void Graphics::CreateRenderTextures()
 	{
-		HRESULT hr;
+		{
+			HRESULT hr;
 
-		//Create Resource Description Structure
-		D3D12_RESOURCE_DESC resourceDescription = {};
-		resourceDescription.DepthOrArraySize = 1;
-		resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		resourceDescription.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		resourceDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-		resourceDescription.Width = clientWidth;
-		resourceDescription.Height = clientHeight;
-		resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-		resourceDescription.MipLevels = 1;
-		resourceDescription.SampleDesc.Count = 1;
+			//Create Resource Description Structure
+			D3D12_RESOURCE_DESC resourceDescription = {};
+			resourceDescription.DepthOrArraySize = 1;
+			resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			resourceDescription.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			resourceDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			resourceDescription.Width = clientWidth;
+			resourceDescription.Height = clientHeight;
+			resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			resourceDescription.MipLevels = 1;
+			resourceDescription.SampleDesc.Count = 1;
 
-		//Create Heap Properties Structure
-		D3D12_HEAP_PROPERTIES heapProperties = {};
-		heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-		heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProperties.CreationNodeMask = 0;
-		heapProperties.VisibleNodeMask = 0;
+			//Create Heap Properties Structure
+			D3D12_HEAP_PROPERTIES heapProperties = {};
+			heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+			heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+			heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+			heapProperties.CreationNodeMask = 0;
+			heapProperties.VisibleNodeMask = 0;
 
-		//Create Committed Resource
-		GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pUnorderedAccess)));
+			//Create Committed Resource
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pUnorderedAccess)));
 
-		//Create Descriptor Heap
-		pUAVHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+			//Create Descriptor Heap
+			pUAVHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 
-		//Create Unordered Access View Description Structure
-		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-		uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			//Create Unordered Access View Description Structure
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-		//Create Render Texture
-		pDevice->CreateUnorderedAccessView(pUnorderedAccess.Get(), nullptr, &uavDesc, pUAVHeap->GetCPUDescriptorHandleForHeapStart());
+			//Create Render Texture
+			pDevice->CreateUnorderedAccessView(pUnorderedAccess.Get(), nullptr, &uavDesc, pUAVHeap->GetCPUDescriptorHandleForHeapStart());
+		}
+
+		{
+			HRESULT hr;
+
+			//Create Resource Description Structure
+			D3D12_RESOURCE_DESC resourceDescription = {};
+			resourceDescription.DepthOrArraySize = 1;
+			resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			resourceDescription.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			resourceDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			resourceDescription.Width = clientWidth;
+			resourceDescription.Height = clientHeight;
+			resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			resourceDescription.MipLevels = 1;
+			resourceDescription.SampleDesc.Count = 1;
+
+			//Create Heap Properties Structure
+			D3D12_HEAP_PROPERTIES heapProperties = {};
+			heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+			heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+			heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+			heapProperties.CreationNodeMask = 0;
+			heapProperties.VisibleNodeMask = 0;
+
+			//Create Committed Resource
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pTempTexture)));
+
+			//Create Descriptor Heap
+			pTempTextureHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+
+			//Create Unordered Access View Description Structure
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+			//Create Render Texture
+			pDevice->CreateUnorderedAccessView(pTempTexture.Get(), nullptr, &uavDesc, pTempTextureHeap->GetCPUDescriptorHandleForHeapStart());
+		}
+
+		{
+			HRESULT hr;
+
+			//Create Resource Description Structure
+			D3D12_RESOURCE_DESC resourceDescription = {};
+			resourceDescription.DepthOrArraySize = 1;
+			resourceDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			resourceDescription.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			resourceDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			resourceDescription.Width = clientWidth;
+			resourceDescription.Height = clientHeight;
+			resourceDescription.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			resourceDescription.MipLevels = 1;
+			resourceDescription.SampleDesc.Count = 1;
+
+			//Create Heap Properties Structure
+			D3D12_HEAP_PROPERTIES heapProperties = {};
+			heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+			heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+			heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+			heapProperties.CreationNodeMask = 0;
+			heapProperties.VisibleNodeMask = 0;
+
+			//Create Committed Resource
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pHistoryBuffer)));
+
+			//Create Descriptor Heap
+			pHistoryBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+
+			//Create Unordered Access View Description Structure
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+			//Create Render Texture
+			pDevice->CreateUnorderedAccessView(pHistoryBuffer.Get(), nullptr, &uavDesc, pHistoryBufferHeap->GetCPUDescriptorHandleForHeapStart());
+		}
 	}
 
 	void Graphics::UpdateUIBuffer()
@@ -696,17 +799,47 @@ namespace Graphics
 		RenderConstants constants;
 		ZeroMemory(&constants, sizeof(constants));
 		constants.time = float(clock()) / CLOCKS_PER_SEC;
+		constants.frame = currentFrame;
 		constants.width = clientWidth;
 		constants.height = clientHeight;
 
-		constants.originX = 350 * cos(constants.time);
-		constants.originY = 200;
-		constants.originZ = 350 * sin(constants.time);
+		constants.originX = 3.6f * std::sin(constants.time * -0.5f);
+		constants.originY = 2.0f;
+		constants.originZ = 3.6f * std::cos(constants.time * -0.5f);
+
+		constants.padding1 = 0;
+		constants.padding2 = 0;
+		constants.padding4 = 0;
+		constants.padding5 = 0;
+		constants.padding6 = 0;
+
+		constants.previousOriginX = (float)camera.position.x;
+		constants.previousOriginY = (float)camera.position.y;
+		constants.previousOriginZ = (float)camera.position.z;
+
+		constants.previousMatrix[0] = camera.cameraToWorldMatrix.GetGpuMatrix()[0];
+		constants.previousMatrix[1] = camera.cameraToWorldMatrix.GetGpuMatrix()[1];
+		constants.previousMatrix[2] = camera.cameraToWorldMatrix.GetGpuMatrix()[2];
+		constants.previousMatrix[3] = camera.cameraToWorldMatrix.GetGpuMatrix()[3];
+		constants.previousMatrix[4] = camera.cameraToWorldMatrix.GetGpuMatrix()[4];
+		constants.previousMatrix[5] = camera.cameraToWorldMatrix.GetGpuMatrix()[5];
+		constants.previousMatrix[6] = camera.cameraToWorldMatrix.GetGpuMatrix()[6];
+		constants.previousMatrix[7] = camera.cameraToWorldMatrix.GetGpuMatrix()[7];
+		constants.previousMatrix[8] = camera.cameraToWorldMatrix.GetGpuMatrix()[8];
 
 		camera.position = Vector3(constants.originX, constants.originY, constants.originZ);
+		camera.targetPosition = Vector3(0, 0, 0);
 		camera.UpdateCameraToWorldMatrix();
 
-		constants.cameraToWorldMatrix = camera.cameraToWorldMatrix.GetGpuMatrix();
+		constants.mat[0] = camera.cameraToWorldMatrix.GetGpuMatrix()[0];
+		constants.mat[1] = camera.cameraToWorldMatrix.GetGpuMatrix()[1];
+		constants.mat[2] = camera.cameraToWorldMatrix.GetGpuMatrix()[2];
+		constants.mat[3] = camera.cameraToWorldMatrix.GetGpuMatrix()[3];
+		constants.mat[4] = camera.cameraToWorldMatrix.GetGpuMatrix()[4];
+		constants.mat[5] = camera.cameraToWorldMatrix.GetGpuMatrix()[5];
+		constants.mat[6] = camera.cameraToWorldMatrix.GetGpuMatrix()[6];
+		constants.mat[7] = camera.cameraToWorldMatrix.GetGpuMatrix()[7];
+		constants.mat[8] = camera.cameraToWorldMatrix.GetGpuMatrix()[8];
 
 		pCommandList->SetComputeRoot32BitConstants(2, (UINT)std::ceil(sizeof(RenderConstants) / 4), &constants, 0);
 	}
@@ -741,6 +874,14 @@ namespace Graphics
 		pCommandList->SetDescriptorHeaps(1, &renderTextureHeap);
 		pCommandList->SetComputeRootDescriptorTable(0, pUAVHeap->GetGPUDescriptorHandleForHeapStart());
 
+		auto tempTextureHeap = pTempTextureHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &tempTextureHeap);
+		pCommandList->SetComputeRootDescriptorTable(6, pTempTextureHeap->GetGPUDescriptorHandleForHeapStart());
+
+		auto reprojectionBufferHeap = pHistoryBufferHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &reprojectionBufferHeap);
+		pCommandList->SetComputeRootDescriptorTable(7, pHistoryBufferHeap->GetGPUDescriptorHandleForHeapStart());
+
 		if (uiManager.ElementCount() != 0)
 		{
 			auto uiBufferheap = uiElementDescriptorHeap.Get();
@@ -755,24 +896,24 @@ namespace Graphics
 		double threadGroupSize = 32;
 		pCommandList->Dispatch((UINT)std::ceil((double)clientWidth / threadGroupSize), (UINT)std::ceil((double)clientHeight / threadGroupSize), 1);
 
-		//Transition uav state to copy src
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		pCommandList->ResourceBarrier(1, &barrier);
+		//Copy history buffer to temp buffer and render uav to backbuffer
+		D3D12_RESOURCE_BARRIER transitionToCopyBarrier[4] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST),
+															  CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+															  CD3DX12_RESOURCE_BARRIER::Transition(pHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+															  CD3DX12_RESOURCE_BARRIER::Transition(pTempTexture.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
 
-		//Transition rtv state to copy dst
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-		pCommandList->ResourceBarrier(1, &barrier);
+		pCommandList->ResourceBarrier(4, transitionToCopyBarrier);
 
-		//Copy uav to rtv
 		pCommandList->CopyResource(pBackBuffers[currentBackBufferIndex].Get(), pUnorderedAccess.Get());
+		pCommandList->CopyResource(pTempTexture.Get(), pHistoryBuffer.Get());
 
-		//Transition rtv state to present
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-		pCommandList->ResourceBarrier(1, &barrier);
+		//Reset resource states
+		D3D12_RESOURCE_BARRIER resetStateBarrier[4] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON),
+														CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+														CD3DX12_RESOURCE_BARRIER::Transition(pHistoryBuffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+														CD3DX12_RESOURCE_BARRIER::Transition(pTempTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) };
 
-		//Transition to uav state to uav for next frame
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		pCommandList->ResourceBarrier(1, &barrier);
+		pCommandList->ResourceBarrier(4, resetStateBarrier);
 
 		GFX_THROW_INFO(pCommandList->Close());
 	}
@@ -792,7 +933,7 @@ namespace Graphics
 			GFX_INFO_START();
 #endif
 			UINT syncInterval = VSyncEnabled ? 1 : 0;
-			if (FAILED(hr = pSwapChain->Present(VSyncEnabled, 0)))
+			if (FAILED(hr = pSwapChain->Present(1, 0)))
 			{
 				if (hr == DXGI_ERROR_DEVICE_REMOVED)
 				{
@@ -803,6 +944,8 @@ namespace Graphics
 					GFX_EXCEPT(hr);
 				}
 			}
+
+			currentFrame++;
 
 			WaitForPreviousFrame();
 		}
