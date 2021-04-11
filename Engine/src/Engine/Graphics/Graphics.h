@@ -111,11 +111,14 @@ namespace Graphics
 		ComPtr<ID3D12Resource> pUnorderedAccess;
 		ComPtr<ID3D12DescriptorHeap> pUAVHeap;
 
-		ComPtr<ID3D12Resource> pTempTexture;
-		ComPtr<ID3D12DescriptorHeap> pTempTextureHeap;
-
 		ComPtr<ID3D12Resource> pHistoryBuffer;
+		ComPtr<ID3D12Resource> pTemporaryHistoryBuffer;
+		ComPtr<ID3D12Resource> pGeomertyHistoryBuffer;
+		ComPtr<ID3D12Resource> pGeomertyTemporaryHistoryBuffer;
 		ComPtr<ID3D12DescriptorHeap> pHistoryBufferHeap;
+		ComPtr<ID3D12DescriptorHeap> pTemporaryHistoryBufferHeap;
+		ComPtr<ID3D12DescriptorHeap> pGeomertyHistoryBufferHeap;
+		ComPtr<ID3D12DescriptorHeap> pGeomertyTemporaryHistoryBufferHeap;
 
 		ComPtr<ID3D12Resource> uiElementBuffer;
 		ComPtr<ID3D12Resource> uiUploadBuffer;

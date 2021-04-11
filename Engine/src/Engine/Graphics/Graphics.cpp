@@ -210,7 +210,7 @@ namespace Graphics
 		renderTextureRootParameter.DescriptorTable = { 1, &renderTextureDescriptorRange };
 		renderTextureRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-		//Root Parameter temp buffer
+		//Root Parameter temporary history buffer
 		D3D12_DESCRIPTOR_RANGE tempTextureDescriptorRange;
 		ZeroMemory(&tempTextureDescriptorRange, sizeof(tempTextureDescriptorRange));
 		tempTextureDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -225,7 +225,7 @@ namespace Graphics
 		tempTextureRootParameter.DescriptorTable = { 1, &tempTextureDescriptorRange };
 		tempTextureRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-		//Root Parameter reprojection buffer
+		//Root Parameter history buffer
 		D3D12_DESCRIPTOR_RANGE reprojectionBufferDescriptorRange;
 		ZeroMemory(&reprojectionBufferDescriptorRange, sizeof(reprojectionBufferDescriptorRange));
 		reprojectionBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -239,6 +239,36 @@ namespace Graphics
 		reprojectionBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		reprojectionBufferRootParameter.DescriptorTable = { 1, &reprojectionBufferDescriptorRange };
 		reprojectionBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter for geomerty history buffer
+		D3D12_DESCRIPTOR_RANGE geomertyHistoryBufferDescriptorRange;
+		ZeroMemory(&geomertyHistoryBufferDescriptorRange, sizeof(geomertyHistoryBufferDescriptorRange));
+		geomertyHistoryBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		geomertyHistoryBufferDescriptorRange.NumDescriptors = 1;
+		geomertyHistoryBufferDescriptorRange.BaseShaderRegister = 5;
+		geomertyHistoryBufferDescriptorRange.RegisterSpace = 0;
+		geomertyHistoryBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER geomertyHistoryBufferRootParameter;
+		ZeroMemory(&geomertyHistoryBufferRootParameter, sizeof(geomertyHistoryBufferRootParameter));
+		geomertyHistoryBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		geomertyHistoryBufferRootParameter.DescriptorTable = { 1, &geomertyHistoryBufferDescriptorRange };
+		geomertyHistoryBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter for geomerty history buffer
+		D3D12_DESCRIPTOR_RANGE temporaryGeomertyHistoryBufferDescriptorRange;
+		ZeroMemory(&temporaryGeomertyHistoryBufferDescriptorRange, sizeof(temporaryGeomertyHistoryBufferDescriptorRange));
+		temporaryGeomertyHistoryBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		temporaryGeomertyHistoryBufferDescriptorRange.NumDescriptors = 1;
+		temporaryGeomertyHistoryBufferDescriptorRange.BaseShaderRegister = 6;
+		temporaryGeomertyHistoryBufferDescriptorRange.RegisterSpace = 0;
+		temporaryGeomertyHistoryBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER temporaryGeomertyHistoryBufferRootParameter;
+		ZeroMemory(&temporaryGeomertyHistoryBufferRootParameter, sizeof(temporaryGeomertyHistoryBufferRootParameter));
+		temporaryGeomertyHistoryBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		temporaryGeomertyHistoryBufferRootParameter.DescriptorTable = { 1, &temporaryGeomertyHistoryBufferDescriptorRange };
+		temporaryGeomertyHistoryBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Root Parameter for UI Element Buffer
 		D3D12_DESCRIPTOR_RANGE uiDescriptorRange;
@@ -308,7 +338,7 @@ namespace Graphics
 		vertexBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Create Root Parameter Array
-		D3D12_ROOT_PARAMETER rootParameters[8] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter, tempTextureRootParameter, reprojectionBufferRootParameter };
+		D3D12_ROOT_PARAMETER rootParameters[10] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter, tempTextureRootParameter, reprojectionBufferRootParameter, geomertyHistoryBufferRootParameter, temporaryGeomertyHistoryBufferRootParameter };
 
 		//Create Root Signature Descriptor Structure
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDescriptor;
@@ -488,10 +518,12 @@ namespace Graphics
 			heapProperties.VisibleNodeMask = 0;
 
 			//Create Committed Resource
-			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pTempTexture)));
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pTemporaryHistoryBuffer)));
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pGeomertyTemporaryHistoryBuffer)));
 
 			//Create Descriptor Heap
-			pTempTextureHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+			pTemporaryHistoryBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+			pGeomertyTemporaryHistoryBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 
 			//Create Unordered Access View Description Structure
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -499,7 +531,8 @@ namespace Graphics
 			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
 			//Create Render Texture
-			pDevice->CreateUnorderedAccessView(pTempTexture.Get(), nullptr, &uavDesc, pTempTextureHeap->GetCPUDescriptorHandleForHeapStart());
+			pDevice->CreateUnorderedAccessView(pTemporaryHistoryBuffer.Get(), nullptr, &uavDesc, pTemporaryHistoryBufferHeap->GetCPUDescriptorHandleForHeapStart());
+			pDevice->CreateUnorderedAccessView(pGeomertyTemporaryHistoryBuffer.Get(), nullptr, &uavDesc, pGeomertyTemporaryHistoryBufferHeap->GetCPUDescriptorHandleForHeapStart());
 		}
 
 		{
@@ -527,9 +560,11 @@ namespace Graphics
 
 			//Create Committed Resource
 			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pHistoryBuffer)));
+			GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&pGeomertyHistoryBuffer)));
 
 			//Create Descriptor Heap
 			pHistoryBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+			pGeomertyHistoryBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 
 			//Create Unordered Access View Description Structure
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -538,6 +573,7 @@ namespace Graphics
 
 			//Create Render Texture
 			pDevice->CreateUnorderedAccessView(pHistoryBuffer.Get(), nullptr, &uavDesc, pHistoryBufferHeap->GetCPUDescriptorHandleForHeapStart());
+			pDevice->CreateUnorderedAccessView(pGeomertyHistoryBuffer.Get(), nullptr, &uavDesc, pGeomertyHistoryBufferHeap->GetCPUDescriptorHandleForHeapStart());
 		}
 	}
 
@@ -803,9 +839,17 @@ namespace Graphics
 		constants.width = clientWidth;
 		constants.height = clientHeight;
 
-		constants.originX = 3.6f * std::sin(constants.time * -0.5f);
-		constants.originY = 2.0f;
-		constants.originZ = 3.6f * std::cos(constants.time * -0.5f);
+		constants.originX = 3.6f * std::sin(constants.time * 1.5f) + 0.5f;
+		constants.originY = 3.0f + std::sin(constants.time * 2.0f);
+		constants.originZ = 3.6f * std::cos(constants.time * 1.0f) + 0.5f;
+
+		float mulBy = std::sqrt(constants.originX * constants.originX + constants.originZ * constants.originZ);
+		constants.originX /= mulBy * 0.2f;
+		constants.originZ /= mulBy * 0.25f;
+
+		/*constants.originX = 3.6f * std::sin(constants.time * 1.0f);
+		constants.originY = 3.0f + std::sin(constants.time * 2.0f);
+		constants.originZ = 3.6f * std::cos(constants.time * 1.0f);*/
 
 		constants.padding1 = 0;
 		constants.padding2 = 0;
@@ -874,13 +918,18 @@ namespace Graphics
 		pCommandList->SetDescriptorHeaps(1, &renderTextureHeap);
 		pCommandList->SetComputeRootDescriptorTable(0, pUAVHeap->GetGPUDescriptorHandleForHeapStart());
 
-		auto tempTextureHeap = pTempTextureHeap.Get();
+		auto tempTextureHeap = pTemporaryHistoryBufferHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &tempTextureHeap);
-		pCommandList->SetComputeRootDescriptorTable(6, pTempTextureHeap->GetGPUDescriptorHandleForHeapStart());
-
+		pCommandList->SetComputeRootDescriptorTable(6, pTemporaryHistoryBufferHeap->GetGPUDescriptorHandleForHeapStart());
 		auto reprojectionBufferHeap = pHistoryBufferHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &reprojectionBufferHeap);
 		pCommandList->SetComputeRootDescriptorTable(7, pHistoryBufferHeap->GetGPUDescriptorHandleForHeapStart());
+		auto geomertyTempTextureHeap = pGeomertyTemporaryHistoryBufferHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &geomertyTempTextureHeap);
+		pCommandList->SetComputeRootDescriptorTable(9, pGeomertyTemporaryHistoryBufferHeap->GetGPUDescriptorHandleForHeapStart());
+		auto geomertyReprojectionBufferHeap = pGeomertyHistoryBufferHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &geomertyReprojectionBufferHeap);
+		pCommandList->SetComputeRootDescriptorTable(8, pGeomertyHistoryBufferHeap->GetGPUDescriptorHandleForHeapStart());
 
 		if (uiManager.ElementCount() != 0)
 		{
@@ -897,23 +946,28 @@ namespace Graphics
 		pCommandList->Dispatch((UINT)std::ceil((double)clientWidth / threadGroupSize), (UINT)std::ceil((double)clientHeight / threadGroupSize), 1);
 
 		//Copy history buffer to temp buffer and render uav to backbuffer
-		D3D12_RESOURCE_BARRIER transitionToCopyBarrier[4] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST),
+		D3D12_RESOURCE_BARRIER transitionToCopyBarrier[6] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST),
 															  CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
-															  CD3DX12_RESOURCE_BARRIER::Transition(pHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
-															  CD3DX12_RESOURCE_BARRIER::Transition(pTempTexture.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
+															  CD3DX12_RESOURCE_BARRIER::Transition(pHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE), 
+															  CD3DX12_RESOURCE_BARRIER::Transition(pGeomertyHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+															  CD3DX12_RESOURCE_BARRIER::Transition(pTemporaryHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST), 
+															  CD3DX12_RESOURCE_BARRIER::Transition(pGeomertyTemporaryHistoryBuffer.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST) };
 
-		pCommandList->ResourceBarrier(4, transitionToCopyBarrier);
+		pCommandList->ResourceBarrier(6, transitionToCopyBarrier);
 
 		pCommandList->CopyResource(pBackBuffers[currentBackBufferIndex].Get(), pUnorderedAccess.Get());
-		pCommandList->CopyResource(pTempTexture.Get(), pHistoryBuffer.Get());
+		pCommandList->CopyResource(pTemporaryHistoryBuffer.Get(), pHistoryBuffer.Get());
+		pCommandList->CopyResource(pGeomertyTemporaryHistoryBuffer.Get(), pGeomertyHistoryBuffer.Get());
 
 		//Reset resource states
-		D3D12_RESOURCE_BARRIER resetStateBarrier[4] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON),
+		D3D12_RESOURCE_BARRIER resetStateBarrier[6] = { CD3DX12_RESOURCE_BARRIER::Transition(pBackBuffers[currentBackBufferIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON),
 														CD3DX12_RESOURCE_BARRIER::Transition(pUnorderedAccess.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
 														CD3DX12_RESOURCE_BARRIER::Transition(pHistoryBuffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
-														CD3DX12_RESOURCE_BARRIER::Transition(pTempTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) };
+														CD3DX12_RESOURCE_BARRIER::Transition(pGeomertyHistoryBuffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+														CD3DX12_RESOURCE_BARRIER::Transition(pTemporaryHistoryBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS), 
+														CD3DX12_RESOURCE_BARRIER::Transition(pGeomertyTemporaryHistoryBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS) };
 
-		pCommandList->ResourceBarrier(4, resetStateBarrier);
+		pCommandList->ResourceBarrier(6, resetStateBarrier);
 
 		GFX_THROW_INFO(pCommandList->Close());
 	}
@@ -933,7 +987,7 @@ namespace Graphics
 			GFX_INFO_START();
 #endif
 			UINT syncInterval = VSyncEnabled ? 1 : 0;
-			if (FAILED(hr = pSwapChain->Present(1, 0)))
+			if (FAILED(hr = pSwapChain->Present(syncInterval, 0)))
 			{
 				if (hr == DXGI_ERROR_DEVICE_REMOVED)
 				{

@@ -34,6 +34,7 @@ struct RayHit
 	float3 normal;
 	float3 position;
 	float3 color;
+	uint meshID;
 };
 
 RWTexture2D<float4> result : register(u0);
@@ -41,6 +42,8 @@ RWStructuredBuffer<BVHNode> nodeHierarchy : register(u1);
 RWStructuredBuffer<Vertex> vertexBuffer : register(u2);
 RWTexture2D<float4> tempResult : register(u3);
 RWTexture2D<float4> reprojectionBuffer : register(u4);
+RWTexture2D<float4> GeomertyHistoryBuffer : register(u5);
+RWTexture2D<float4> TemporaryGeomertyHistoryBuffer : register(u6);
 
 struct UIElement
 {
@@ -160,7 +163,8 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 	hit.color = float3(0.5, 0.5, 0.5);
 	hit.distance = 1.#INF;
 	hit.position = float3(0, 0, 0);
-	hit.normal = float3(0, 1, 0);
+	hit.normal = float3(0, 0, 0);
+	hit.meshID = 0;
 
 	unsigned int currentIndex = ROOT_NODE_INDEX;
 	unsigned int lastIndex = 4294967295;
@@ -195,6 +199,8 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 						float2 uv = (float2)vertexBuffer[index2].UV * intersect.y + (float2)vertexBuffer[index3].UV * intersect.z + (float2)vertexBuffer[index1].UV * intersect.w;
 
 						hit.color = float3(0.2, 0.8, 1);
+
+						hit.meshID = 1;
 					}
 				}
 			}
@@ -216,6 +222,8 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 		hit.distance = t;
 		hit.position = rayOrigin + rayDirection * t;
 		hit.color = saturate(filteredChecker(hit.position.xz * 2) + 0.5);
+		hit.normal = float3(0, 1, 0);
+		hit.meshID = 2;
 	}
 
 	hit.position = (hit.distance * rayDirection + rayOrigin);
@@ -234,22 +242,33 @@ float hash(uint state)
 	return (float)state * 0.0000000002328306437;
 }
 
-float4 sampleTempBuffer(float2 pos)
+float4 sampleTempBuffer(float2 pos, float3 normal, float4 color, float distance, uint id)
 {
 	float2 fpos = pos - floor(pos);
+	float4 col = 0;
 
-	float4 col1 = tempResult[uint2(pos.x, pos.y)] * (1 - fpos.x) * (1 - fpos.y);
-	float4 col2 = tempResult[uint2(pos.x, pos.y + 1)] * (1 - fpos.x) * fpos.y;
-	float4 col3 = tempResult[uint2(pos.x + 1, pos.y)] * fpos.x * (1 - fpos.y);
-	float4 col4 = tempResult[uint2(pos.x + 1, pos.y + 1)] * fpos.x * fpos.y;
+	const float alpha = 0.025;
 
-	return col1 + col2 + col3 + col4;
+	uint2 currentPos = uint2(pos.x, pos.y);
+	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * (1 - fpos.y);
+
+	currentPos = uint2(pos.x, pos.y + 1);
+	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * fpos.y;
+
+	currentPos = uint2(pos.x + 1, pos.y);
+	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * (1 - fpos.y);
+
+	currentPos = uint2(pos.x + 1, pos.y + 1);
+	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * fpos.y;
+
+	return col;
 }
 
 [numthreads(32, 32, 1)]
 void main(uint2 id : SV_DispatchThreadID)
 {
 	float2 offset = float2(hash(frac(time) * 100), hash(frac(time) * 100 + 1));
+	offset = float2(0.5, 0.5);
 
 	float2 uv = (-int2(width, height) + 2.0 * (id + offset)) / (float)height;
 
@@ -263,14 +282,14 @@ void main(uint2 id : SV_DispatchThreadID)
 	{
 		float random = hash(id.x * width + id.y + (frac(time + 1) * 65536));
 		float3 lightDir = float3(0.57735 + random * 0.05, 0.57735 + hash(random * 65536 + 1) * 0.05, 0.57735 + hash(random * 65536) * 0.05);
-		bool inShadow = SampleScene(hit.position + (hit.normal * 0.001), lightDir).distance == 1.#INF;
+		bool inShadow = SampleScene(hit.position + (hit.normal * 0.005), lightDir).distance == 1.#INF;
 		float lighting = (saturate(dot(hit.normal, float3(0.57735, 0.57735, 0.57735))) * inShadow) + 0.05;
 
 		color = float4(hit.color * lighting, 1);
 	}
 	else
 	{
-		hit.distance = -1;
+		hit.distance = 10000;
 		color = float4(hit.color, 1);
 	}
 
@@ -280,16 +299,9 @@ void main(uint2 id : SV_DispatchThreadID)
 
 	float2 rasterSpace = ((float2(ndc.x, -ndc.y) * (float)height + float2(width, height)) / 2.0) - offset;
 
-	float4 reprojectedColor = sampleTempBuffer(rasterSpace);
+	reprojectionBuffer[id] = float4(sampleTempBuffer(rasterSpace, hit.normal, color, hit.distance, hit.meshID).xyz, hit.distance);
 
-	if (abs(hit.distance - reprojectedColor.w) > 0.1 || rasterSpace.x < 0 || rasterSpace.y < 0 || frame == 0)
-	{
-		reprojectionBuffer[id] = float4(color.xyz, hit.distance);
-	}
-	else
-	{
-		reprojectionBuffer[id] = float4(color.xyz * 0.01 + reprojectedColor.xyz * 0.99, hit.distance);
-	}
+	GeomertyHistoryBuffer[id] = float4(hit.normal, hit.meshID);
 
 	result[id] = reprojectionBuffer[id];
 }
