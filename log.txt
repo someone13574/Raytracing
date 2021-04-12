@@ -1,3 +1,3 @@
-[--Log--][21:4:23][enginelogger.cpp, 013]   Cleared Log!
-[--Log--][21:4:23][meshmanager.cpp, 020]   Reading Mesh File C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/ObjTest.obj
-[--Log--][21:4:23][meshmanager.cpp, 051]   Finished Reading Mesh File. Task time: 0.158 seconds
+[--Log--][10:16:9][enginelogger.cpp, 013]   Cleared Log!
+[--Log--][10:16:9][meshmanager.cpp, 020]   Reading Mesh File C:/Users/Owen/Documents/C++/RaytracingEngine/Meshfiles/ObjTest.obj
+[--Log--][10:16:9][meshmanager.cpp, 051]   Finished Reading Mesh File. Task time: 0.149 seconds

@@ -14,11 +14,10 @@ struct Vertex
 
 struct BVHNode
 {
-	uint triangleIndex;
+	unsigned int triangleIndex;
 
-	uint parentIndex;
-	uint childAIndex;
-	uint childBIndex;
+	unsigned int hitLink;
+	unsigned int missLink;
 
 	float ax;
 	float ay;
@@ -167,52 +166,37 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 	hit.meshID = 0;
 
 	unsigned int currentIndex = ROOT_NODE_INDEX;
-	unsigned int lastIndex = 4294967295;
 
 	float3 fractionalRayDirection = 1 / rayDirection;
-	while (currentIndex != 4294967295u)
+	while (currentIndex != 4294967294u)
 	{
 		BVHNode node = nodeHierarchy[currentIndex];
-
-		if (lastIndex == node.parentIndex)
+		if (boxIntersection(rayOrigin, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz)))
 		{
-			if (boxIntersection(rayOrigin, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz)))
+			if (node.isLeaf == 1)
 			{
-				if (node.isLeaf == 0)
+				uint index1 = (triangleBuffer[node.triangleIndex].indices1 & 0x000fffff);
+				uint index2 = ((triangleBuffer[node.triangleIndex].indices1 & 0xfff00000) >> 20) | ((triangleBuffer[node.triangleIndex].indices2 & 0x00000ff) << 12);
+				uint index3 = ((triangleBuffer[node.triangleIndex].indices2 & 0x0fffff00) >> 8);
+
+				float4 intersect = triIntersect(rayOrigin, rayDirection, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position);
+				if (intersect.x < hit.distance)
 				{
-					lastIndex = currentIndex;
-					currentIndex = node.childAIndex;
-					continue;
-				}
-				else
-				{
-					uint index1 = (triangleBuffer[node.triangleIndex].indices1 & 0x000fffff);
-					uint index2 = ((triangleBuffer[node.triangleIndex].indices1 & 0xfff00000) >> 20) | ((triangleBuffer[node.triangleIndex].indices2 & 0x00000ff) << 12);
-					uint index3 = ((triangleBuffer[node.triangleIndex].indices2 & 0x0fffff00) >> 8);
+					hit.distance = intersect.x;
+					hit.normal = normalize(((float3)vertexBuffer[index2].normal * intersect.y) + ((float3)vertexBuffer[index3].normal * intersect.z) + ((float3)vertexBuffer[index1].normal * intersect.w));
 
-					float4 intersect = triIntersect(rayOrigin, rayDirection, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position);
-					if (intersect.x < hit.distance)
-					{
-						hit.distance = intersect.x;
-						hit.normal = normalize(((float3)vertexBuffer[index2].normal * intersect.y) + ((float3)vertexBuffer[index3].normal * intersect.z) + ((float3)vertexBuffer[index1].normal * intersect.w));
+					float2 uv = (float2)vertexBuffer[index2].UV * intersect.y + (float2)vertexBuffer[index3].UV * intersect.z + (float2)vertexBuffer[index1].UV * intersect.w;
 
-						float2 uv = (float2)vertexBuffer[index2].UV * intersect.y + (float2)vertexBuffer[index3].UV * intersect.z + (float2)vertexBuffer[index1].UV * intersect.w;
+					hit.color = float3(0.2, 0.8, 1);
 
-						hit.color = float3(0.2, 0.8, 1);
-
-						hit.meshID = 1;
-					}
+					hit.meshID = 1;
 				}
 			}
-			lastIndex = currentIndex;
-			currentIndex = node.parentIndex;
-			continue;
+			currentIndex = node.hitLink;
 		}
 		else
 		{
-			bool tempbool = lastIndex == node.childAIndex;
-			lastIndex = currentIndex;
-			currentIndex = (tempbool) ? node.childBIndex : node.parentIndex;
+			currentIndex = node.missLink;
 		}
 	}
 

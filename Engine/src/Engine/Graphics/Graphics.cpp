@@ -713,7 +713,7 @@ namespace Graphics
 
 			{
 				//Update BVH
-				UINT bvhElementSize{ static_cast<UINT>(sizeof(Mesh::Node)) };
+				UINT bvhElementSize{ static_cast<UINT>(sizeof(Mesh::LinkedNode)) };
 				UINT bvhNodeBufferSize{ static_cast<UINT>(meshManager->GetMesh(0).nodeHierarchy.size() * bvhElementSize) };
 
 				D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
@@ -739,7 +739,7 @@ namespace Graphics
 
 				void* pData;
 				GFX_THROW_INFO(boundingVolumeHierarchyUploadBuffer->Map(0, NULL, &pData));
-				memcpy(pData, meshManager->GetMesh(0).nodeHierarchy.data(), bvhNodeBufferSize);
+				memcpy(pData, meshManager->GetMesh(0).GetLinkedNodeHierarchy().data(), bvhNodeBufferSize);
 				boundingVolumeHierarchyUploadBuffer->Unmap(0, NULL);
 				pCommandList->CopyBufferRegion(boundingVolumeHierarchyBuffer.Get(), 0, boundingVolumeHierarchyUploadBuffer.Get(), 0, bvhNodeBufferSize);
 				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(boundingVolumeHierarchyBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

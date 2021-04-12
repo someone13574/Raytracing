@@ -322,24 +322,98 @@ void Mesh::AddTriangle(Mesh::Vertex triangleVertices[3])
 	}
 }
 
-unsigned int Mesh::GetMaxStackSize()
+std::vector<Mesh::LinkedNode> Mesh::GetLinkedNodeHierarchy()
 {
-	std::stack<unsigned int> stack;
-	unsigned int maxSize = 0;
+	std::vector<LinkedNode> linkedNodeHierarchy;
 
-	stack.push(rootIndex);
-
-	while (stack.size() > 0)
+	//Allocate Nodes with base information
+	for (unsigned int i = 0; i < nodeHierarchy.size(); i++)
 	{
-		uint32_t currentIndex = stack.top();
-		stack.pop();
-		if (!nodeHierarchy[currentIndex].isLeaf)
-		{
-			stack.push(nodeHierarchy[currentIndex].childAIndex);
-			stack.push(nodeHierarchy[currentIndex].childBIndex);
-		}
-		maxSize = __max(maxSize, (unsigned int)stack.size());
+		Node currentNode = nodeHierarchy[i];
+
+		LinkedNode currentLinkedNode;
+		currentLinkedNode.triangleIndex = currentNode.triangleIndex;
+		currentLinkedNode.hitLink = 4294967295;
+		currentLinkedNode.missLink = 4294967295;
+		currentLinkedNode.aabb = currentNode.aabb;
+		currentLinkedNode.isLeaf = currentNode.isLeaf;
+
+		linkedNodeHierarchy.push_back(currentLinkedNode);
 	}
 
-	return maxSize;
+	{ //Create hit links
+		unsigned int last = 4294967295;
+		std::stack<unsigned int> stack;
+		stack.push(rootIndex);
+		while (stack.size() > 0)
+		{
+			unsigned int currentIndex = stack.top();
+			Node currentNode = nodeHierarchy[currentIndex];
+			stack.pop();
+
+			if (last != 4294967295)
+			{
+				linkedNodeHierarchy[last].hitLink = currentIndex;
+			}
+			last = currentIndex;
+
+			if (currentNode.isLeaf == 0)
+			{
+				stack.push(currentNode.childBIndex);
+				stack.push(currentNode.childAIndex);
+			}
+		}
+		linkedNodeHierarchy[last].hitLink = 4294967294;
+	}
+
+	{ //Create miss links
+		for (unsigned int i = 0; i < nodeHierarchy.size(); i++)
+		{
+			std::stack<unsigned int> stack;
+			stack.push(i);
+
+			while (stack.size() > 0)
+			{
+				unsigned int currentIndex = stack.top();
+				Node currentNode = nodeHierarchy[currentIndex];
+				
+				if (linkedNodeHierarchy[currentIndex].missLink != 4294967295)
+				{
+					stack.pop();
+				}
+				else
+				{
+					if (currentNode.parentIndex != 4294967295)
+					{
+						Node parentNode = nodeHierarchy[currentNode.parentIndex];
+						if (currentIndex == parentNode.childAIndex)
+						{
+							linkedNodeHierarchy[currentIndex].missLink = parentNode.childBIndex;
+							stack.pop();
+							stack.push(parentNode.childBIndex);
+						}
+						else
+						{
+							if (linkedNodeHierarchy[currentNode.parentIndex].missLink != 4294967295)
+							{
+								linkedNodeHierarchy[currentIndex].missLink = linkedNodeHierarchy[currentNode.parentIndex].missLink;
+								stack.pop();
+							}
+							else
+							{
+								stack.push(currentNode.parentIndex);
+							}
+						}
+					}
+					else
+					{
+						linkedNodeHierarchy[currentIndex].missLink = 4294967294;
+						stack.pop();
+					}
+				}
+			}
+		}
+	}
+
+	return linkedNodeHierarchy;
 }
