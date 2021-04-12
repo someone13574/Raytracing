@@ -250,16 +250,16 @@ float4 sampleTempBuffer(float2 pos, float3 normal, float4 color, float distance,
 	const float alpha = 0.025;
 
 	uint2 currentPos = uint2(pos.x, pos.y);
-	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * (1 - fpos.y);
+	col += ((uint)TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * (1 - fpos.y);
 
 	currentPos = uint2(pos.x, pos.y + 1);
-	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * fpos.y;
+	col += ((uint)TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * fpos.y;
 
 	currentPos = uint2(pos.x + 1, pos.y);
-	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * (1 - fpos.y);
+	col += ((uint)TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * (1 - fpos.y);
 
 	currentPos = uint2(pos.x + 1, pos.y + 1);
-	col += (TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * fpos.y;
+	col += ((uint)TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * fpos.x * fpos.y : (color * alpha + tempResult[currentPos] * (1 - alpha)) * fpos.x * fpos.y;
 
 	return col;
 }
