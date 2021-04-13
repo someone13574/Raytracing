@@ -147,12 +147,15 @@ float filteredChecker(float2 p)
 	return .5 - .5*s.x*s.y;
 }
 
-bool boxIntersection(float3 origin, float3 inverseDirection, float3 lowerCorner, float3 upperCorner)
+bool boxIntersection(float3 origin, float3 inverseDirection, float3 lowerCorner, float3 upperCorner, float minDst)
 {
 	float3 t1 = (lowerCorner - origin) * inverseDirection;
 	float3 t2 = (upperCorner - origin) * inverseDirection;
 
-	return min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z)) >= max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
+	float minT = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
+	float maxT = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z));
+
+	return maxT >= minT && minT < minDst;
 }
 
 float hash(uint state)
@@ -172,11 +175,12 @@ bool ShadowSampleScene(float3 position, uint2 id)
 	float3 direction = float3(0.57735 + random * 0.05, 0.57735 + hash(random * 65536 + 1) * 0.05, 0.57735 + hash(random * 65536) * 0.05);
 
 	unsigned int currentIndex = ROOT_NODE_INDEX;
+
 	float3 fractionalRayDirection = 1 / direction;
 	while (currentIndex != 4294967294u)
 	{
 		BVHNode node = nodeHierarchy[currentIndex];
-		if (boxIntersection(position, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz)))
+		if (boxIntersection(position, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz), 1.#INF))
 		{
 			if (node.isLeaf == 1)
 			{
@@ -184,7 +188,6 @@ bool ShadowSampleScene(float3 position, uint2 id)
 				uint index2 = ((triangleBuffer[node.triangleIndex].indices1 & 0xfff00000) >> 20) | ((triangleBuffer[node.triangleIndex].indices2 & 0x00000ff) << 12);
 				uint index3 = ((triangleBuffer[node.triangleIndex].indices2 & 0x0fffff00) >> 8);
 
-				float4 intersect = triIntersect(position, direction, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position);
 				if (triIntersect(position, direction, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position).x != 1.#INF)
 				{
 					return false;
@@ -222,7 +225,7 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 	while (currentIndex != 4294967294u)
 	{
 		BVHNode node = nodeHierarchy[currentIndex];
-		if (boxIntersection(rayOrigin, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz)))
+		if (boxIntersection(rayOrigin, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz), hit.distance))
 		{
 			if (node.isLeaf == 1)
 			{
@@ -234,6 +237,7 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 				if (intersect.x < hit.distance)
 				{
 					hit.distance = intersect.x;
+					hit.position = (hit.distance * rayDirection + rayOrigin);
 					hit.normal = normalize(((float3)vertexBuffer[index2].normal * intersect.y) + ((float3)vertexBuffer[index3].normal * intersect.z) + ((float3)vertexBuffer[index1].normal * intersect.w));
 
 					float2 uv = (float2)vertexBuffer[index2].UV * intersect.y + (float2)vertexBuffer[index3].UV * intersect.z + (float2)vertexBuffer[index1].UV * intersect.w;
@@ -260,8 +264,6 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 		hit.normal = float3(0, 1, 0);
 		hit.meshID = 2;
 	}
-
-	hit.position = (hit.distance * rayDirection + rayOrigin);
 
 	return hit;
 }
@@ -329,5 +331,5 @@ void main(uint2 id : SV_DispatchThreadID)
 
 	float4 uiColor = SampleUI(id);
 
-	result[id] = lerp(reprojectionBuffer[id], uiColor, uiColor.w);
+	result[id] = reprojectionBuffer[id];
 }
