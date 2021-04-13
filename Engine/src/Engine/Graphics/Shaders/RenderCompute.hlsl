@@ -118,28 +118,27 @@ float4 triIntersect(float3 origin, float3 rayDirection, float3 v0, float3 v1, fl
 	return float4(t, u, v, 1 - u - v);
 }
 
-float4 sampleUI(float2 position)
+float4 SampleUI(float2 position)
 {
-	float minDst = 1.#INF;
-
 	uint count = 0;
 	uint stride = 0;
 	uiElements.GetDimensions(count, stride);
 
-	uint colorId = 0;
-	for (uint i = 0; i < count; i++)
+	float4 uiColor = float4(0, 0, 0, 0);
+
+	for (unsigned int i = 0; i < count; i++)
 	{
 		UIElement element = uiElements[i];
 		float2 d = abs(float2(element.xPosition, element.yPosition) - position) - (float2(element.xScale, element.yScale) - element.roundness);
 		float dst = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - element.roundness;
-		if (dst < minDst)
+
+		if (dst < 1)
 		{
-			minDst = dst;
-			colorId = i;
+			uiColor = float4(element.r, element.g, element.b, 1) * saturate(-dst);
 		}
 	}
 
-	return (count != 0) ? float4(uiElements[colorId].r, uiElements[colorId].g, uiElements[colorId].b, minDst) : 1;
+	return uiColor;
 }
 
 float filteredChecker(float2 p)
@@ -154,6 +153,58 @@ bool boxIntersection(float3 origin, float3 inverseDirection, float3 lowerCorner,
 	float3 t2 = (upperCorner - origin) * inverseDirection;
 
 	return min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z)) >= max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
+}
+
+float hash(uint state)
+{
+	state ^= 2747636419u;
+	state *= 2654435769u;
+	state ^= state >> 16;
+	state *= 2654435769u;
+	state ^= state >> 16;
+	state *= 2654435769u;
+	return (float)state * 0.0000000002328306437;
+}
+
+bool ShadowSampleScene(float3 position, uint2 id)
+{
+	float random = hash(id.x * width + id.y + (frac(time + 1) * 65536));
+	float3 direction = float3(0.57735 + random * 0.05, 0.57735 + hash(random * 65536 + 1) * 0.05, 0.57735 + hash(random * 65536) * 0.05);
+
+	unsigned int currentIndex = ROOT_NODE_INDEX;
+	float3 fractionalRayDirection = 1 / direction;
+	while (currentIndex != 4294967294u)
+	{
+		BVHNode node = nodeHierarchy[currentIndex];
+		if (boxIntersection(position, fractionalRayDirection, float3(node.ax, node.ay, node.az), float3(node.bx, node.by, node.bz)))
+		{
+			if (node.isLeaf == 1)
+			{
+				uint index1 = (triangleBuffer[node.triangleIndex].indices1 & 0x000fffff);
+				uint index2 = ((triangleBuffer[node.triangleIndex].indices1 & 0xfff00000) >> 20) | ((triangleBuffer[node.triangleIndex].indices2 & 0x00000ff) << 12);
+				uint index3 = ((triangleBuffer[node.triangleIndex].indices2 & 0x0fffff00) >> 8);
+
+				float4 intersect = triIntersect(position, direction, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position);
+				if (triIntersect(position, direction, (float3)vertexBuffer[index1].position, (float3)vertexBuffer[index2].position, (float3)vertexBuffer[index3].position).x != 1.#INF)
+				{
+					return false;
+				}
+			}
+			currentIndex = node.hitLink;
+		}
+		else
+		{
+			currentIndex = node.missLink;
+		}
+	}
+
+	float t = -position.y * fractionalRayDirection.y;
+	if (t > 0 && t != 1.#INF && length(position + direction * t) < 6)
+	{
+		return false;
+	}
+
+	return true;
 }
 
 RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
@@ -201,7 +252,7 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 	}
 
 	float t = -rayOrigin.y / rayDirection.y;
-	if (t > 0 && t < hit.distance && length(rayOrigin + rayDirection * t) < 4)
+	if (t > 0 && t < hit.distance && length(rayOrigin + rayDirection * t) < 6)
 	{
 		hit.distance = t;
 		hit.position = rayOrigin + rayDirection * t;
@@ -215,23 +266,12 @@ RayHit SampleScene(float3 rayOrigin, float3 rayDirection)
 	return hit;
 }
 
-float hash(uint state)
-{
-	state ^= 2747636419u;
-	state *= 2654435769u;
-	state ^= state >> 16;
-	state *= 2654435769u;
-	state ^= state >> 16;
-	state *= 2654435769u;
-	return (float)state * 0.0000000002328306437;
-}
-
 float4 sampleTempBuffer(float2 pos, float3 normal, float4 color, float distance, uint id)
 {
 	float2 fpos = pos - floor(pos);
 	float4 col = 0;
 
-	const float alpha = 0.025;
+	const float alpha = 0.01;
 
 	uint2 currentPos = uint2(pos.x, pos.y);
 	col += ((uint)TemporaryGeomertyHistoryBuffer[currentPos].w != id || distance > 1000 || currentPos.x <= 0 || currentPos.y <= 0 || frame < 10 || any(abs(TemporaryGeomertyHistoryBuffer[currentPos].xyz - normal) > 0.05)) ? color * (1 - fpos.x) * (1 - fpos.y) : (color * alpha + tempResult[currentPos] * (1 - alpha)) * (1 - fpos.x) * (1 - fpos.y);
@@ -266,7 +306,7 @@ void main(uint2 id : SV_DispatchThreadID)
 	{
 		float random = hash(id.x * width + id.y + (frac(time + 1) * 65536));
 		float3 lightDir = float3(0.57735 + random * 0.05, 0.57735 + hash(random * 65536 + 1) * 0.05, 0.57735 + hash(random * 65536) * 0.05);
-		bool inShadow = SampleScene(hit.position + (hit.normal * 0.005), lightDir).distance == 1.#INF;
+		bool inShadow = ShadowSampleScene(hit.position + (hit.normal * 0.01), id);
 		float lighting = (saturate(dot(hit.normal, float3(0.57735, 0.57735, 0.57735))) * inShadow) + 0.05;
 
 		color = float4(hit.color * lighting, 1);
@@ -287,5 +327,7 @@ void main(uint2 id : SV_DispatchThreadID)
 
 	GeomertyHistoryBuffer[id] = float4(hit.normal, hit.meshID);
 
-	result[id] = reprojectionBuffer[id];
+	float4 uiColor = SampleUI(id);
+
+	result[id] = lerp(reprojectionBuffer[id], uiColor, uiColor.w);
 }

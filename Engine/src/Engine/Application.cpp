@@ -9,7 +9,7 @@
 
 namespace Engine
 {
-	Application::Application() : window(1920, 1080, "Engine Window") //112, 63
+	Application::Application() : window(1920, 1080, "Engine Window")
 	{
 
 	}

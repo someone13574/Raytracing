@@ -847,10 +847,6 @@ namespace Graphics
 		constants.originX /= mulBy * 0.2f;
 		constants.originZ /= mulBy * 0.25f;
 
-		/*constants.originX = 3.6f * std::sin(constants.time * 1.0f);
-		constants.originY = 3.0f + std::sin(constants.time * 2.0f);
-		constants.originZ = 3.6f * std::cos(constants.time * 1.0f);*/
-
 		constants.padding1 = 0;
 		constants.padding2 = 0;
 		constants.padding4 = 0;
