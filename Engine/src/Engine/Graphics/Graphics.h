@@ -46,6 +46,10 @@ namespace Graphics
 
 		float previousMatrix[9];
 	};
+	struct RadixSortConstant
+	{
+		unsigned int shift;
+	};
 
 	class ENGINE_DLL_DS Graphics
 	{
@@ -136,11 +140,20 @@ namespace Graphics
 		ComPtr<ID3D12Resource> vertexUploadBuffer;
 		ComPtr<ID3D12DescriptorHeap> vertexDescriptorHeap;
 
+		ComPtr<ID3D12Resource> mortonCodeBuffer;
+		ComPtr<ID3D12DescriptorHeap> mortonCodeDescriptorHeap;
+		ComPtr<ID3D12Resource> blockPrefixSumBuffer;
+		ComPtr<ID3D12DescriptorHeap> blockPrefixSumDescriptorHeap;
+		ComPtr<ID3D12Resource> tempBlockPrefixSumBuffer;
+		ComPtr<ID3D12DescriptorHeap> tempBlockPrefixSumDescriptorHeap;
+
 		UINT RTVDescriptorSize;
 		UINT UAVDescriptorSize;
 		UINT currentBackBufferIndex;
 
 		ComPtr<ID3D12PipelineState> pRenderPipelineState;
+		ComPtr<ID3D12PipelineState> pVertexPipelineState;
+		ComPtr<ID3D12PipelineState> pRadixPipelineState;
 
 		ComPtr<ID3D12RootSignature> pRootSignature;
 

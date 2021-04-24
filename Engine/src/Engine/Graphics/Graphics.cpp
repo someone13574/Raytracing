@@ -292,6 +292,11 @@ namespace Graphics
 		constantsRootParameter.Constants = { 0, 0, (UINT)std::ceil(sizeof(RenderConstants) / 4) };
 		constantsRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+		D3D12_ROOT_PARAMETER radixSortConstant;
+		ZeroMemory(&radixSortConstant, sizeof(radixSortConstant));
+		radixSortConstant.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		radixSortConstant.Constants = { 1, 0, (UINT)std::ceil(sizeof(RadixSortConstant) / 4) };
+
 		//Root Parameter for Triangle Buffer
 		D3D12_DESCRIPTOR_RANGE triangleBufferDescriptorRange;
 		ZeroMemory(&triangleBufferDescriptorRange, sizeof(triangleBufferDescriptorRange));
@@ -306,6 +311,51 @@ namespace Graphics
 		triangleBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		triangleBufferRootParameter.DescriptorTable = { 1, &triangleBufferDescriptorRange };
 		triangleBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter for Morton Codes
+		D3D12_DESCRIPTOR_RANGE mortonCodeBufferDescriptorRange;
+		ZeroMemory(&mortonCodeBufferDescriptorRange, sizeof(mortonCodeBufferDescriptorRange));
+		mortonCodeBufferDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		mortonCodeBufferDescriptorRange.NumDescriptors = 1;
+		mortonCodeBufferDescriptorRange.BaseShaderRegister = 7;
+		mortonCodeBufferDescriptorRange.RegisterSpace = 0;
+		mortonCodeBufferDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER mortonCodeBufferRootParameter;
+		ZeroMemory(&mortonCodeBufferRootParameter, sizeof(mortonCodeBufferRootParameter));
+		mortonCodeBufferRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		mortonCodeBufferRootParameter.DescriptorTable = { 1, &mortonCodeBufferDescriptorRange };
+		mortonCodeBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter Block Histogram prefix sum
+		D3D12_DESCRIPTOR_RANGE blockScanDescriptorRange;
+		ZeroMemory(&blockScanDescriptorRange, sizeof(blockScanDescriptorRange));
+		blockScanDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		blockScanDescriptorRange.NumDescriptors = 1;
+		blockScanDescriptorRange.BaseShaderRegister = 8;
+		blockScanDescriptorRange.RegisterSpace = 0;
+		blockScanDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER blockScanRootParameter;
+		ZeroMemory(&blockScanRootParameter, sizeof(blockScanRootParameter));
+		blockScanRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		blockScanRootParameter.DescriptorTable = { 1, &blockScanDescriptorRange };
+		blockScanRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		//Root Parameter temporary Block Histogram prefix sum
+		D3D12_DESCRIPTOR_RANGE tempBlockScanDescriptorRange;
+		ZeroMemory(&tempBlockScanDescriptorRange, sizeof(tempBlockScanDescriptorRange));
+		tempBlockScanDescriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		tempBlockScanDescriptorRange.NumDescriptors = 1;
+		tempBlockScanDescriptorRange.BaseShaderRegister = 9;
+		tempBlockScanDescriptorRange.RegisterSpace = 0;
+		tempBlockScanDescriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER tempBlockScanRootParameter;
+		ZeroMemory(&tempBlockScanRootParameter, sizeof(tempBlockScanRootParameter));
+		tempBlockScanRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		tempBlockScanRootParameter.DescriptorTable = { 1, &tempBlockScanDescriptorRange };
+		tempBlockScanRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Root Parameter for Bounding Volume Hierarchy Node Buffer
 		D3D12_DESCRIPTOR_RANGE bvhNodeBufferDescriptorRange;
@@ -338,7 +388,7 @@ namespace Graphics
 		vertexBufferRootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		//Create Root Parameter Array
-		D3D12_ROOT_PARAMETER rootParameters[10] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter, tempTextureRootParameter, reprojectionBufferRootParameter, geomertyHistoryBufferRootParameter, temporaryGeomertyHistoryBufferRootParameter };
+		D3D12_ROOT_PARAMETER rootParameters[14] = { renderTextureRootParameter, uiBufferRootParameter, constantsRootParameter, triangleBufferRootParameter, bvhNodeBufferRootParameter, vertexBufferRootParameter, tempTextureRootParameter, reprojectionBufferRootParameter, geomertyHistoryBufferRootParameter, temporaryGeomertyHistoryBufferRootParameter, mortonCodeBufferRootParameter, radixSortConstant, blockScanRootParameter, tempBlockScanRootParameter };
 
 		//Create Root Signature Descriptor Structure
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDescriptor;
@@ -360,24 +410,51 @@ namespace Graphics
 	{
 		HRESULT hr;
 
-		//Compile
-		UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_DEBUG; //D3DCOMPILE_WARNINGS_ARE_ERRORS
-
+		//Compile render compute shader
+		UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG; //D3DCOMPILE_WARNINGS_ARE_ERRORS, D3DCOMPILE_OPTIMIZATION_LEVEL3
 		char buffer[8];
 		_itoa_s(meshManager->GetMesh(0).rootIndex, buffer, 8, 10);
 		std::string rootNodeIndexStr = std::string(buffer);
-
 		D3D_SHADER_MACRO rootNodeIndexMacro = { "ROOT_NODE_INDEX", rootNodeIndexStr.c_str() };
-
 		D3D_SHADER_MACRO defines[] = { rootNodeIndexMacro,  { NULL, NULL } };
+		ID3DBlob* renderShaderBlob = nullptr;
+		ID3DBlob* renderErrorBlob = nullptr;
+		HRESULT shaderHR = D3DCompileFromFile(L"C:/Users/Owen/Documents/C++/RaytracingEngine/Engine/src/Engine/Graphics/Shaders/RenderCompute.hlsl", defines, D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", "cs_5_1", flags, 0, &renderShaderBlob, &renderErrorBlob);
 
-		ID3DBlob* shaderBlob = nullptr;
-		ID3DBlob* errorBlob = nullptr;
-		HRESULT shaderHR = D3DCompileFromFile(L"C:/Users/Owen/Documents/C++/RaytracingEngine/Engine/src/Engine/Graphics/Shaders/RenderCompute.hlsl", defines, D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", "cs_5_1", flags, 0, &shaderBlob, &errorBlob);
-
-		if (FAILED(shaderHR) && errorBlob)
+		if (FAILED(shaderHR) && renderErrorBlob)
 		{
-			const char* errorMsg = (const char*)errorBlob->GetBufferPointer();
+			const char* errorMsg = (const char*)renderErrorBlob->GetBufferPointer();
+			MessageBox(nullptr, errorMsg, "Shader Compilation Error", MB_OK | MB_ICONERROR | MB_TASKMODAL | MB_TOPMOST | MB_SETFOREGROUND);
+			PostQuitMessage(-1);
+			ExitProcess(-1);
+		}
+
+		//Compile morton code compute shader
+		D3D_SHADER_MACRO mortonCodeDefines[] = { NULL, NULL };
+		ID3DBlob* vertexShaderBlob = nullptr;
+		ID3DBlob* vertexErrorBlob = nullptr;
+		shaderHR = D3DCompileFromFile(L"C:/Users/Owen/Documents/C++/RaytracingEngine/Engine/src/Engine/Graphics/Shaders/MortonCodeCompute.hlsl", defines, D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", "cs_5_1", flags, 0, &vertexShaderBlob, &vertexErrorBlob);
+
+		if (FAILED(shaderHR) && vertexErrorBlob)
+		{
+			const char* errorMsg = (const char*)vertexErrorBlob->GetBufferPointer();
+			MessageBox(nullptr, errorMsg, "Shader Compilation Error", MB_OK | MB_ICONERROR | MB_TASKMODAL | MB_TOPMOST | MB_SETFOREGROUND);
+			PostQuitMessage(-1);
+			ExitProcess(-1);
+		}
+
+		//Compile radix sort compute shader
+		_itoa_s((int)std::ceil(meshManager->GetMesh(0).triangles.size() / 1024.0), buffer, 8, 10);
+		std::string radixSortChunkSize = std::string(buffer);
+		D3D_SHADER_MACRO radixChunkSizeMacro = { "CHUNK_SIZE", radixSortChunkSize.c_str() };
+		D3D_SHADER_MACRO radixComputeDefines[] = { radixChunkSizeMacro, { NULL, NULL } };
+		ID3DBlob* sortShaderBlob = nullptr;
+		ID3DBlob* sortErrorBlob = nullptr;
+		shaderHR = D3DCompileFromFile(L"C:/Users/Owen/Documents/C++/RaytracingEngine/Engine/src/Engine/Graphics/Shaders/RadixSortCompute.hlsl", radixComputeDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", "cs_5_1", flags, 0, &sortShaderBlob, &sortErrorBlob);
+
+		if (FAILED(shaderHR) && sortErrorBlob)
+		{
+			const char* errorMsg = (const char*)sortErrorBlob->GetBufferPointer();
 			MessageBox(nullptr, errorMsg, "Shader Compilation Error", MB_OK | MB_ICONERROR | MB_TASKMODAL | MB_TOPMOST | MB_SETFOREGROUND);
 			PostQuitMessage(-1);
 			ExitProcess(-1);
@@ -387,13 +464,33 @@ namespace Graphics
 		D3D12_COMPUTE_PIPELINE_STATE_DESC renderPipelineStateDescription;
 		ZeroMemory(&renderPipelineStateDescription, sizeof(renderPipelineStateDescription));
 		renderPipelineStateDescription.pRootSignature = pRootSignature.Get();
-		renderPipelineStateDescription.CS = { reinterpret_cast<UINT8*>(shaderBlob->GetBufferPointer()), shaderBlob->GetBufferSize() };
+		renderPipelineStateDescription.CS = { reinterpret_cast<UINT8*>(renderShaderBlob->GetBufferPointer()), renderShaderBlob->GetBufferSize() };
 		renderPipelineStateDescription.NodeMask = 0;
 		renderPipelineStateDescription.CachedPSO = { NULL, 0 };
 		renderPipelineStateDescription.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
-		//Create Pipeline State
+		//Create Description Structure For Morton Code Pipeline State
+		D3D12_COMPUTE_PIPELINE_STATE_DESC vertexPipelineStateDescription;
+		ZeroMemory(&vertexPipelineStateDescription, sizeof(vertexPipelineStateDescription));
+		vertexPipelineStateDescription.pRootSignature = pRootSignature.Get();
+		vertexPipelineStateDescription.CS = { reinterpret_cast<UINT8*>(vertexShaderBlob->GetBufferPointer()), vertexShaderBlob->GetBufferSize() };
+		vertexPipelineStateDescription.NodeMask = 0;
+		vertexPipelineStateDescription.CachedPSO = { NULL, 0 };
+		vertexPipelineStateDescription.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+		//Create Description Structure For Radix Sort Pipeline State
+		D3D12_COMPUTE_PIPELINE_STATE_DESC radixPipelineStateDescription;
+		ZeroMemory(&radixPipelineStateDescription, sizeof(radixPipelineStateDescription));
+		radixPipelineStateDescription.pRootSignature = pRootSignature.Get();
+		radixPipelineStateDescription.CS = { reinterpret_cast<UINT8*>(sortShaderBlob->GetBufferPointer()), sortShaderBlob->GetBufferSize() };
+		radixPipelineStateDescription.NodeMask = 0;
+		radixPipelineStateDescription.CachedPSO = { NULL, 0 };
+		radixPipelineStateDescription.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+		//Create Pipeline States
 		GFX_THROW_INFO(pDevice->CreateComputePipelineState(&renderPipelineStateDescription, IID_PPV_ARGS(&pRenderPipelineState)));
+		GFX_THROW_INFO(pDevice->CreateComputePipelineState(&vertexPipelineStateDescription, IID_PPV_ARGS(&pVertexPipelineState)));
+		GFX_THROW_INFO(pDevice->CreateComputePipelineState(&radixPipelineStateDescription, IID_PPV_ARGS(&pRadixPipelineState)));
 	}
 #pragma endregion
 
@@ -640,8 +737,8 @@ namespace Graphics
 
 		if (!meshManager->IsUpToDate())
 		{
+			std::vector<Mesh::Triangle> triangleData = meshManager->GetTriangleArray();
 			{
-				std::vector<Mesh::Triangle> triangleData = meshManager->GetTriangleArray();
 
 				UINT elementSize{ static_cast<UINT>(sizeof(Mesh::Triangle)) };
 				UINT bufferSize{ static_cast<UINT>(triangleData.size() * elementSize) };
@@ -744,6 +841,43 @@ namespace Graphics
 				pCommandList->CopyBufferRegion(boundingVolumeHierarchyBuffer.Get(), 0, boundingVolumeHierarchyUploadBuffer.Get(), 0, bvhNodeBufferSize);
 				auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(boundingVolumeHierarchyBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 				pCommandList->ResourceBarrier(1, &barrier);
+			}
+
+			{
+				//Create Morton Code Buffer and block prefix sum
+				UINT mortonCodeSize{ static_cast<UINT>(sizeof(unsigned int) * 2) };
+				UINT mortonBufferSize{ static_cast<UINT>(triangleData.size() * mortonCodeSize) };
+
+				UINT histogramScanBufferCount = (UINT)2048;
+
+				D3D12_HEAP_PROPERTIES heapProperties = { D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
+
+				CD3DX12_RESOURCE_DESC resourceDescription = CD3DX12_RESOURCE_DESC::Buffer(mortonBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+				CD3DX12_RESOURCE_DESC histogramScanResourceDescription = CD3DX12_RESOURCE_DESC::Buffer(histogramScanBufferCount * sizeof(unsigned int), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDescription, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&mortonCodeBuffer)));
+				mortonCodeDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &histogramScanResourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&blockPrefixSumBuffer)));
+				blockPrefixSumDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+				GFX_THROW_INFO(pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &histogramScanResourceDescription, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&tempBlockPrefixSumBuffer)));
+				tempBlockPrefixSumDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC mortonCodeBufferDescriptor;
+				ZeroMemory(&mortonCodeBufferDescriptor, sizeof(mortonCodeBufferDescriptor));
+				mortonCodeBufferDescriptor.Format = DXGI_FORMAT_UNKNOWN;
+				mortonCodeBufferDescriptor.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				mortonCodeBufferDescriptor.Buffer = { 0, (UINT)triangleData.size(), mortonCodeSize, 0, D3D12_BUFFER_UAV_FLAG_NONE };
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC histogramScanDescriptor;
+				ZeroMemory(&histogramScanDescriptor, sizeof(histogramScanDescriptor));
+				histogramScanDescriptor.Format = DXGI_FORMAT_UNKNOWN;
+				histogramScanDescriptor.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				histogramScanDescriptor.Buffer = { 0, histogramScanBufferCount, sizeof(unsigned int), 0, D3D12_BUFFER_UAV_FLAG_NONE };
+
+				static UINT descriptorSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				GFX_THROW_INFO_ONLY(pDevice->CreateUnorderedAccessView(mortonCodeBuffer.Get(), nullptr, &mortonCodeBufferDescriptor, mortonCodeDescriptorHeap->GetCPUDescriptorHandleForHeapStart()));
+				GFX_THROW_INFO_ONLY(pDevice->CreateUnorderedAccessView(blockPrefixSumBuffer.Get(), nullptr, &histogramScanDescriptor, blockPrefixSumDescriptorHeap->GetCPUDescriptorHandleForHeapStart()));
+				GFX_THROW_INFO_ONLY(pDevice->CreateUnorderedAccessView(tempBlockPrefixSumBuffer.Get(), nullptr, &histogramScanDescriptor, tempBlockPrefixSumDescriptorHeap->GetCPUDescriptorHandleForHeapStart()));
 			}
 		}
 	}
@@ -889,7 +1023,7 @@ namespace Graphics
 		HRESULT hr;
 
 		GFX_THROW_INFO(pCommandAllocator->Reset());
-		GFX_THROW_INFO(pCommandList->Reset(pCommandAllocator.Get(), pRenderPipelineState.Get()));
+		GFX_THROW_INFO(pCommandList->Reset(pCommandAllocator.Get(), pVertexPipelineState.Get()));
 
 		UpdateUIBuffer();
 		UpdateTriangleBuffer();
@@ -909,6 +1043,16 @@ namespace Graphics
 		auto bvhBufferHeap = boundingVolumeHierarchyDescriptorHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &bvhBufferHeap);
 		pCommandList->SetComputeRootDescriptorTable(4, bvhBufferHeap->GetGPUDescriptorHandleForHeapStart());
+
+		auto mortonCodeHeap = mortonCodeDescriptorHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &mortonCodeHeap);
+		pCommandList->SetComputeRootDescriptorTable(10, mortonCodeHeap->GetGPUDescriptorHandleForHeapStart());
+		auto histogramScanHeap = blockPrefixSumDescriptorHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &histogramScanHeap);
+		pCommandList->SetComputeRootDescriptorTable(12, histogramScanHeap->GetGPUDescriptorHandleForHeapStart());
+		auto tempHistogramScanHeap = tempBlockPrefixSumDescriptorHeap.Get();
+		pCommandList->SetDescriptorHeaps(1, &tempHistogramScanHeap);
+		pCommandList->SetComputeRootDescriptorTable(13, tempHistogramScanHeap->GetGPUDescriptorHandleForHeapStart());
 
 		auto renderTextureHeap = pUAVHeap.Get();
 		pCommandList->SetDescriptorHeaps(1, &renderTextureHeap);
@@ -937,8 +1081,24 @@ namespace Graphics
 		//Set Constants
 		SetRenderConstants();
 
-		//Execute compute shader
+		//Calculate Morton Codes from triangle centers
+		pCommandList->Dispatch((UINT)std::ceil((double)meshManager->GetTriangleArray().size() / 1024.0), 1, 1);
+
+		//Sort morton codes
+		pCommandList->SetPipelineState(pRadixPipelineState.Get());
+		for (unsigned int i = 0; i < 4; i++)
+		{
+			RadixSortConstant radixSortConstant;
+			ZeroMemory(&radixSortConstant, sizeof(radixSortConstant));
+			radixSortConstant.shift = i;
+
+			pCommandList->SetComputeRoot32BitConstants(11, (UINT)std::ceil(sizeof(RadixSortConstant) / 4), &radixSortConstant, 0);
+			pCommandList->Dispatch(1, 1, 1);
+		}
+
+		//Render image
 		double threadGroupSize = 32;
+		pCommandList->SetPipelineState(pRenderPipelineState.Get());
 		pCommandList->Dispatch((UINT)std::ceil((double)clientWidth / threadGroupSize), (UINT)std::ceil((double)clientHeight / threadGroupSize), 1);
 
 		//Copy history buffer to temp buffer and render uav to backbuffer
@@ -975,6 +1135,8 @@ namespace Graphics
 			HRESULT hr;
 
 			QueueCommands();
+
+
 
 			ID3D12CommandList* ppCommandLists[] = { pCommandList.Get() };
 			pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);

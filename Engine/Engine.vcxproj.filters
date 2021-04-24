@@ -89,5 +89,7 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="src\Engine\Graphics\Shaders\RenderCompute.hlsl" />
+    <FxCompile Include="src\Engine\Graphics\Shaders\MortonCodeCompute.hlsl" />
+    <FxCompile Include="src\Engine\Graphics\Shaders\RadixSortCompute.hlsl" />
   </ItemGroup>
 </Project>
